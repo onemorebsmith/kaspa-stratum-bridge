@@ -42,7 +42,7 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 		clients:    make(map[string]*MinerConnection),
 		jobs:       make(map[string]*appmessage.RPCBlock),
 	}
-	client, err := rpcclient.NewRPCClient("localhost:16110")
+	client, err := rpcclient.NewRPCClient(cfg.RPCServer)
 	if err != nil {
 		log.Printf("failed to connect to kaspa server: %s", err)
 	}
