@@ -27,7 +27,9 @@ all-in-one (build + run) `cd cmd/bridge/;go build .;./bridge`
 
 ## Easy way (docker) -- TODO
 -- WIP
+
 Modify the config file in ./cmd/bridge/config.yaml with your setup
+
 run `docker build .`
 
 ### Buy me a coffee?
