@@ -32,5 +32,7 @@ Modify the config file in ./cmd/bridge/config.yaml with your setup
 
 run `docker build .`
 
-### Buy me a coffee?
+
+
+## Buy me a coffee?
 Tips appreciated: `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp`
