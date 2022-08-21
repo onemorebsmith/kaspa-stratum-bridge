@@ -193,6 +193,6 @@ func (s *StratumServer) newBlockReady() {
 	s.clientLock.RLock()
 	defer s.clientLock.RUnlock()
 	for _, v := range s.clients {
-		v.NewBlockTemplate(job, newDiff)
+		go v.NewBlockTemplate(job, newDiff)
 	}
 }

@@ -26,23 +26,33 @@ func (mc *MinerConnection) log(msg string) {
 	log.Printf("[%s] %s", mc.tag, msg)
 }
 
-func (mc *MinerConnection) listen() (*StratumEvent, error) {
-	buffer := make([]byte, 1024*10)
+func (mc *MinerConnection) listen() ([]*StratumEvent, error) {
+	buffer := make([]byte, 1024)
 	_, err := mc.connection.Read(buffer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading from connection %s", mc.connection.RemoteAddr().String())
 	}
-	mc.tag = mc.connection.RemoteAddr().String()
 	asStr := string(buffer)
-	asStr = strings.TrimRight(asStr, "\x00")
-	event := &StratumEvent{}
-	return event, json.Unmarshal([]byte(asStr), event)
+	asStr = strings.ReplaceAll(asStr, "\x00", "")
+	var events []*StratumEvent
+	for _, v := range strings.Split(asStr, "\n") {
+		if len(v) == 0 {
+			continue
+		}
+		event := &StratumEvent{}
+		if err := json.Unmarshal([]byte(v), event); err != nil {
+			continue
+		}
+		events = append(events, event)
+	}
+	return events, nil
 }
 
 func (mc *MinerConnection) RunStratum(s *StratumServer) {
+	mc.tag = mc.connection.RemoteAddr().String()
 	mc.server = s
 	for {
-		event, err := mc.listen()
+		events, err := mc.listen()
 		if err != nil {
 			if checkDisconnect(err) {
 				mc.log("disconnected")
@@ -52,10 +62,12 @@ func (mc *MinerConnection) RunStratum(s *StratumServer) {
 			mc.log(fmt.Sprintf("error processing connection: %s", err))
 			return
 		}
-		mc.log(fmt.Sprintf("[stratum] received %s", event.Method))
-		if err := mc.processEvent(event); err != nil {
-			mc.log(err.Error())
-			return
+		for _, e := range events {
+			mc.log(fmt.Sprintf("[stratum] received %s", e.Method))
+			if err := mc.processEvent(e); err != nil {
+				mc.log(err.Error())
+				return
+			}
 		}
 	}
 }
