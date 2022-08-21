@@ -3,6 +3,8 @@ This is a quick applet that listens for incoming stratum connections from miners
 
 Tested on x64 macos & ubuntu w/ lolminer
 
+No fee, forever. Do what you want with it. 
+
 Huge shoutout to https://github.com/KaffinPX/KStratum for the inspiration
 
 # Install
