@@ -111,6 +111,9 @@ func checkDisconnect(err error) bool {
 	if errors.Is(err, syscall.EPIPE) {
 		return true
 	}
+	if errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
 	return false
 }
 

@@ -15,6 +15,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+type BridgeConfig struct {
+	StratumPort string `yaml:"stratum_port"`
+	RPCServer   string `yaml:"kaspad_address"`
+	MiningAddr  string `yaml:"miner_address"`
+}
+
 type StratumServer struct {
 	newBlockChan chan struct{}
 	cfg          BridgeConfig
@@ -184,8 +190,8 @@ func (s *StratumServer) newBlockReady() {
 	}
 	job.Jobs = GenerateJobHeader(job.Header)
 
-	s.clientLock.Lock()
-	defer s.clientLock.Unlock()
+	s.clientLock.RLock()
+	defer s.clientLock.RUnlock()
 	for _, v := range s.clients {
 		v.NewBlockTemplate(job, newDiff)
 	}
