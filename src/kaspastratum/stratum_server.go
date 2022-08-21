@@ -55,7 +55,7 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 	s.kaspad = client
 
 	go func() {
-		const tickerTime = 500 * time.Millisecond
+		const tickerTime = 5000 * time.Millisecond
 		ticker := time.NewTicker(tickerTime)
 		for {
 			select {

@@ -8,7 +8,7 @@ Tested on x64 macos & ubuntu
 ## Manual build
 Install go 1.18 using whatever package manager is approprate for your system
 
-run `cd cmd/bridge;go build .`
+run `cd cmd/kaspabridge;go build .`
 
 Modify the config file in ./cmd/bridge/config.yaml with your setup
 ```
@@ -21,11 +21,9 @@ Modify the config file in ./cmd/bridge/config.yaml with your setup
 ```
 
 
-run `./bridge` in the `cmd/bridge` directory
+run `./kaspabridge` in the `cmd/kaspabridge` directory
 
-
-all-in-one (build + run) `cd cmd/bridge/;go build .;./bridge`
-
+all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 
 ## Easy way (docker) -- TODO
 -- WIP

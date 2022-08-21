@@ -1,0 +1,6 @@
+# stratum_listen_port: the port that will be listening for incoming stratum traffic
+stratum_port: 8080
+# kaspad_address: address/port of the rpc server for kaspad, typically 16110
+kaspad_address: localhost:16110
+# miner_address: address to mine to
+miner_address: kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp
