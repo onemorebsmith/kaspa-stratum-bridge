@@ -1,4 +1,29 @@
-__debug_bin
-cmd/bridge/bridge
-cmd/bridge/bridge.log
+# Temp files
+*~
+
+# Databases
+kaspad.db
+*-shm
+*-wal
+
+# Log files
+*.log
+
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# IDE
+.idea
 .vscode
+debug
+debug.test
+__debug_bin
+
+./cmd/bridge/bridge
+cmd/bridge/bridge.log
