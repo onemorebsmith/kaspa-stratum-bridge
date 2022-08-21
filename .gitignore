@@ -25,5 +25,5 @@ debug
 debug.test
 __debug_bin
 
-cmd/bridge/kaspabridge
-cmd/bridge/bridge.log
+cmd/kaspabridge/kaspabridge
+cmd/kaspabridge/bridge.log
