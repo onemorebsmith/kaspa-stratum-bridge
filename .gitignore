@@ -25,5 +25,5 @@ debug
 debug.test
 __debug_bin
 
-./cmd/bridge/bridge
+cmd/bridge/bridge
 cmd/bridge/bridge.log
