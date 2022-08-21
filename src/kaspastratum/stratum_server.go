@@ -156,6 +156,12 @@ func (s *StratumServer) SubmitResult(incoming *StratumEvent) *StratumResult {
 
 var blockCounter = 0
 
+func (s *StratumServer) disconnected(mc *MinerConnection) {
+	s.clientLock.Lock()
+	delete(s.clients, mc.connection.RemoteAddr().String())
+	s.clientLock.Unlock()
+}
+
 func (s *StratumServer) newBlockReady() {
 	template, err := s.kaspad.GetBlockTemplate(s.cfg.MiningAddr, `"kaspa-proxy.dev=["emthreeve"]`)
 	if err != nil {
@@ -182,8 +188,5 @@ func (s *StratumServer) newBlockReady() {
 	defer s.clientLock.Unlock()
 	for _, v := range s.clients {
 		v.NewBlockTemplate(job, newDiff)
-		if v.Disconnected {
-			delete(s.clients, v.connection.RemoteAddr().String())
-		}
 	}
 }

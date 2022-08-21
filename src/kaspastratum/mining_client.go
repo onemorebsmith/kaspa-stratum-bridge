@@ -15,12 +15,11 @@ import (
 )
 
 type MinerConnection struct {
-	connection   net.Conn
-	counter      int32
-	Disconnected bool
-	server       *StratumServer
-	diff         float64
-	tag          string
+	connection net.Conn
+	counter    int32
+	server     *StratumServer
+	diff       float64
+	tag        string
 }
 
 func (mc *MinerConnection) log(msg string) {
@@ -46,8 +45,8 @@ func (mc *MinerConnection) RunStratum(s *StratumServer) {
 		event, err := mc.listen()
 		if err != nil {
 			if checkDisconnect(err) {
-				mc.Disconnected = true
 				mc.log("disconnected")
+				mc.server.disconnected(mc)
 				return
 			}
 			mc.log(fmt.Sprintf("error processing connection: %s", err))
@@ -76,20 +75,28 @@ func (mc *MinerConnection) processEvent(event *StratumEvent) error {
 		}
 	case "mining.authorize":
 		mc.log("authorized")
-		mc.SendResult(StratumResult{
+		if err := mc.SendResult(StratumResult{
 			Version: "2.0",
 			Id:      event.Id,
 			Result:  true,
-		})
-		mc.SendEvent(StratumEvent{
+		}); err != nil {
+			return err
+		}
+		// send a default diff, we'll calculate the actual diff later when
+		// a new block template is ready
+		if err := mc.SendEvent(StratumEvent{
 			Version: "2.0",
 			Method:  "mining.set_difficulty",
 			Params:  []any{5.0},
-		})
+		}); err != nil {
+			return err
+		}
 	case "mining.submit":
 		mc.log("found block")
 		res := mc.server.SubmitResult(event)
-		mc.SendResult(*res)
+		if err := mc.SendResult(*res); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -119,7 +126,8 @@ func (mc *MinerConnection) SendEvent(res StratumEvent) error {
 	encoded = append(encoded, '\n')
 	_, err = mc.connection.Write(encoded)
 	if checkDisconnect(err) {
-		mc.Disconnected = true
+		mc.log("disconnected")
+		mc.server.disconnected(mc)
 	}
 	return err
 }
@@ -133,13 +141,15 @@ func (mc *MinerConnection) SendResult(res StratumResult) error {
 	encoded = append(encoded, '\n')
 	_, err = mc.connection.Write(encoded)
 	if checkDisconnect(err) {
-		mc.Disconnected = true
+		mc.log("disconnected")
+		mc.server.disconnected(mc)
 	}
 	return err
 }
 
 func (mc *MinerConnection) NewBlockTemplate(job BlockJob, diff float64) {
 	if mc.diff != diff {
+		// new difficulty level, update the client
 		mc.diff = diff
 		if err := mc.SendEvent(StratumEvent{
 			Version: "2.0",
@@ -151,6 +161,7 @@ func (mc *MinerConnection) NewBlockTemplate(job BlockJob, diff float64) {
 		}
 	}
 
+	// normal notify flow
 	if err := mc.SendEvent(StratumEvent{
 		Version: "2.0",
 		Method:  "mining.notify",
