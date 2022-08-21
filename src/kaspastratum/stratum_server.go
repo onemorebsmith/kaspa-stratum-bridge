@@ -15,8 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type blockCallback func(appmessage.NewBlockTemplateNotificationMessage)
-
 type StratumServer struct {
 	newBlockChan chan struct{}
 	cfg          BridgeConfig
@@ -34,7 +32,7 @@ func (s *StratumServer) spawnClient(conn net.Conn) {
 	s.clientLock.Lock()
 	s.clients[conn.RemoteAddr().String()] = remote
 	s.clientLock.Unlock()
-	remote.RunStratum(s)
+	go remote.RunStratum(s)
 }
 
 func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
@@ -69,6 +67,7 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error listening")
 	}
+	defer server.Close()
 
 	err = client.RegisterForNewBlockTemplateNotifications(func(_ *appmessage.NewBlockTemplateNotificationMessage) {
 		select {
@@ -83,12 +82,11 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 	for {
 		connection, err := server.Accept()
 		if err != nil {
-			break
+			log.Printf("failed to accept incoming connection: %s", err)
+			continue
 		}
 		s.spawnClient(connection)
 	}
-
-	return nil, nil
 }
 
 type BlockJob struct {

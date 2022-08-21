@@ -11,6 +11,8 @@ import (
 )
 
 func main() {
+	log.SetOutput(os.Stdout)
+
 	pwd, _ := os.Getwd()
 	fullPath := path.Join(pwd, "config.yaml")
 	log.Printf("loading config @ `%s`", fullPath)
