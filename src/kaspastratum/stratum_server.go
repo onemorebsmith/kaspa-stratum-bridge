@@ -99,6 +99,7 @@ type BlockJob struct {
 }
 
 func (s *StratumServer) SubmitResult(incoming *StratumEvent) *StratumResult {
+	log.Println("[Server] Submitting block to kaspad")
 	jobId, ok := incoming.Params[1].(string)
 	if !ok {
 		log.Printf("unexpected type for param 1: %+v", incoming.Params...)
@@ -133,16 +134,19 @@ func (s *StratumServer) SubmitResult(incoming *StratumEvent) *StratumResult {
 	}
 	switch msg {
 	case appmessage.RejectReasonNone:
+		log.Println("[Server] block accepted!!")
 		return &StratumResult{
 			Result: true,
 		}
 		// :)
 	case appmessage.RejectReasonBlockInvalid:
+		log.Println("[Server] block reject, unknown issue (probably bad pow)")
 		// :'(
 		return &StratumResult{
 			Result: []any{20, "Unknown problem", nil},
 		}
 	case appmessage.RejectReasonIsInIBD:
+		log.Println("[Server] block reject, stale")
 		// stale
 		return &StratumResult{
 			Result: []any{21, "Job not found", nil},
