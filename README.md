@@ -26,6 +26,10 @@ Modify the config file in ./cmd/bridge/config.yaml with your setup
     miner_address: kaspa:{your_address_here}
 ```
 
+run `./kaspabridge` in the `cmd/kaspabridge` directory
+
+all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
+
 # TODO
 * Docker
 * Command-line flags support
@@ -34,18 +38,6 @@ Modify the config file in ./cmd/bridge/config.yaml with your setup
 * Discord/telegram notifications
 
 
-run `./kaspabridge` in the `cmd/kaspabridge` directory
-
-all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
-
-## Easy way (docker) -- TODO
--- WIP
-
-Modify the config file in ./cmd/bridge/config.yaml with your setup
-
-run `docker build .`
 
 
-
-## Buy me a coffee?
 Tips appreciated: `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp`
