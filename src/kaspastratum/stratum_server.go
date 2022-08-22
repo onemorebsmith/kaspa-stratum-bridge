@@ -18,7 +18,6 @@ import (
 type BridgeConfig struct {
 	StratumPort string `yaml:"stratum_port"`
 	RPCServer   string `yaml:"kaspad_address"`
-	MiningAddr  string `yaml:"miner_address"`
 }
 
 type StratumServer struct {
@@ -27,8 +26,6 @@ type StratumServer struct {
 	kaspad       *rpcclient.RPCClient
 	clients      map[string]*MinerConnection
 	clientLock   sync.RWMutex
-
-	jobs map[string]*appmessage.RPCBlock
 }
 
 func (mc *StratumServer) log(msg string) {
@@ -36,9 +33,7 @@ func (mc *StratumServer) log(msg string) {
 }
 
 func (s *StratumServer) spawnClient(conn net.Conn) {
-	remote := &MinerConnection{
-		connection: conn,
-	}
+	remote := NewConnection(conn, s)
 	s.clientLock.Lock()
 	s.clients[conn.RemoteAddr().String()] = remote
 	s.clientLock.Unlock()
@@ -50,7 +45,6 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 		cfg:        cfg,
 		clientLock: sync.RWMutex{},
 		clients:    make(map[string]*MinerConnection),
-		jobs:       make(map[string]*appmessage.RPCBlock),
 	}
 	client, err := rpcclient.NewRPCClient(cfg.RPCServer)
 	if err != nil {
@@ -59,7 +53,7 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 	s.kaspad = client
 
 	go func() {
-		const tickerTime = 5000 * time.Millisecond
+		const tickerTime = 1000 * time.Millisecond
 		ticker := time.NewTicker(tickerTime)
 		for {
 			select {
@@ -118,18 +112,8 @@ type BlockJob struct {
 	JobId     int
 }
 
-func (s *StratumServer) SubmitResult(incoming *StratumEvent) *StratumResult {
+func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, incoming *StratumEvent) *StratumResult {
 	s.log("submitting block to kaspad")
-	jobId, ok := incoming.Params[1].(string)
-	if !ok {
-		log.Printf("unexpected type for param 1: %+v", incoming.Params...)
-		return nil
-	}
-	block, exists := s.jobs[jobId]
-	if !exists {
-		s.log(fmt.Sprintf("job does not exist: %+v", incoming.Params...))
-		return nil
-	}
 	noncestr, ok := incoming.Params[2].(string)
 	if !ok {
 		s.log(fmt.Sprintf("unexpected type for param 2: %+v", incoming.Params...))
@@ -153,6 +137,11 @@ func (s *StratumServer) SubmitResult(incoming *StratumEvent) *StratumResult {
 		s.log(fmt.Sprintf("failed to submit block: %+v", err))
 	}
 	switch msg {
+	default:
+		s.log("[Server] block accepted!!")
+		return &StratumResult{
+			Result: true,
+		}
 	case appmessage.RejectReasonNone:
 		s.log("[Server] block accepted!!")
 		return &StratumResult{
@@ -172,7 +161,6 @@ func (s *StratumServer) SubmitResult(incoming *StratumEvent) *StratumResult {
 			Result: []any{21, "Job not found", nil},
 		}
 	}
-	return nil
 }
 
 var blockCounter = 0
@@ -184,30 +172,9 @@ func (s *StratumServer) disconnected(mc *MinerConnection) {
 }
 
 func (s *StratumServer) newBlockReady() {
-	template, err := s.kaspad.GetBlockTemplate(s.cfg.MiningAddr, `"kaspa-stratum-bridge=["onemorebsmith"]`)
-	if err != nil {
-		s.log(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
-		return
-	}
-	blockCounter++
-	blockId := blockCounter % 128
-	s.jobs[fmt.Sprintf("%d", blockId)] = template.Block
-
-	newDiff := CalculateTarget(uint64(template.Block.Header.Bits))
-	job := BlockJob{
-		Timestamp: template.Block.Header.Timestamp,
-		JobId:     blockId,
-	}
-	job.Header, err = SerializeBlockHeader(template.Block)
-	if err != nil {
-		s.log(fmt.Sprintf("failed to serialize block header: %s", err))
-		return
-	}
-	job.Jobs = GenerateJobHeader(job.Header)
-
 	s.clientLock.RLock()
 	defer s.clientLock.RUnlock()
 	for _, v := range s.clients {
-		go v.NewBlockTemplate(job, newDiff)
+		go v.NewBlockAvailable()
 	}
 }

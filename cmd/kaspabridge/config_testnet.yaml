@@ -2,5 +2,3 @@
 stratum_port: 8080
 # kaspad_address: address/port of the rpc server for kaspad, typically 16110
 kaspad_address: 144.76.19.91:30120
-# miner_address: address to mine to
-miner_address: kaspatest:qrejztvuqnedf756zfmgz2wy6z4v5u4q3dqjpa6269gjlmqpkfkd7sgc8tn6p
