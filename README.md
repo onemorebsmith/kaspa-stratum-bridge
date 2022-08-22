@@ -26,6 +26,13 @@ Modify the config file in ./cmd/bridge/config.yaml with your setup
     miner_address: kaspa:{your_address_here}
 ```
 
+# TODO
+* Docker
+* Command-line flags support
+* Miner-specific addresses 
+* 'Pool'-like process, issue smaller diff to miners
+* Discord/telegram notifications
+
 
 run `./kaspabridge` in the `cmd/kaspabridge` directory
 
