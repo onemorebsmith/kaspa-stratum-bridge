@@ -1,5 +1,7 @@
 # Kaspa Stratum/GRPC bridge
-This is a quick applet that listens for incoming stratum connections from miners and does the translation between stratum events and the expected events from kaspad. 
+This is an daemon that listens for incoming stratum connections from miners and does the translation between stratum events and the expected events from kaspad. This allows solo-mining kaspa with a local node (or on a public node) while mining with stratum-based miners such as lolminer.
+
+2-3ms response time via `stratum-ping` using a local node and remote miner
 
 Tested on x64 macos & ubuntu w/ lolminer
 
