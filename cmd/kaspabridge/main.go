@@ -33,5 +33,7 @@ func main() {
 	log.Printf("\tmining_addr: %s", cfg.MiningAddr)
 	log.Println("----------------------------------")
 
-	kaspastratum.ListenAndServe(cfg)
+	if _, err := kaspastratum.ListenAndServe(cfg); err != nil {
+		log.Println(err)
+	}
 }
