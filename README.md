@@ -18,8 +18,9 @@ run `cd cmd/kaspabridge;go build .`
 
 Modify the config file in ./cmd/bridge/config.yaml with your setup
 ```
-    # stratum_port: the port that will be listening for incoming stratum traffic
-    stratum_port: 8080
+    # stratum_port: the port that will be listening for incoming stratum traffic, 
+    # Note `:PORT` format is needed if not specifiying a specific ip range 
+    stratum_port: :8080
     # kaspad_address: address/port of the rpc server for kaspad, typically 16110
     kaspad_address: localhost:16110
 ```
