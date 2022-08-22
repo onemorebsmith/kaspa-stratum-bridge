@@ -31,7 +31,6 @@ all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 # TODO
 * Docker
 * Command-line flags support
-* Miner-specific addresses 
 * 'Pool'-like process, issue smaller diff to miners
 * Discord/telegram notifications
 
