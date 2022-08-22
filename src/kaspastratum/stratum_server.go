@@ -69,7 +69,7 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 	}()
 
 	_ = client
-	server, err := net.Listen("tcp", ":8080")
+	server, err := net.Listen("tcp", cfg.StratumPort)
 	if err != nil {
 		return nil, errors.Wrap(err, "error listening")
 	}
