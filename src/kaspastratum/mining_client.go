@@ -3,6 +3,7 @@ package kaspastratum
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"syscall"
 
 	"io"
@@ -11,15 +12,19 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/pkg/errors"
 )
 
 type MinerConnection struct {
-	connection net.Conn
-	counter    int32
-	server     *StratumServer
-	diff       float64
-	tag        string
+	connection   net.Conn
+	counter      int32
+	server       *StratumServer
+	diff         float64
+	tag          string
+	minerAddress string
+
+	jobs map[string]*appmessage.RPCBlock
 }
 
 func (mc *MinerConnection) log(msg string) {
@@ -48,9 +53,16 @@ func (mc *MinerConnection) listen() ([]*StratumEvent, error) {
 	return events, nil
 }
 
+func NewConnection(connection net.Conn, server *StratumServer) *MinerConnection {
+	return &MinerConnection{
+		connection: connection,
+		server:     server,
+		tag:        connection.RemoteAddr().String(),
+		jobs:       make(map[string]*appmessage.RPCBlock),
+	}
+}
+
 func (mc *MinerConnection) RunStratum(s *StratumServer) {
-	mc.tag = mc.connection.RemoteAddr().String()
-	mc.server = s
 	for {
 		events, err := mc.listen()
 		if err != nil {
@@ -86,47 +98,72 @@ func (mc *MinerConnection) processEvent(event *StratumEvent) error {
 			return err
 		}
 	case "mining.authorize":
-		mc.log("authorized")
-		if err := mc.SendResult(StratumResult{
-			Version: "2.0",
-			Id:      event.Id,
-			Result:  true,
-		}); err != nil {
-			return err
-		}
-		// send a default diff, we'll calculate the actual diff later when
-		// a new block template is ready
-		if err := mc.SendEvent(StratumEvent{
-			Version: "2.0",
-			Method:  "mining.set_difficulty",
-			Params:  []any{5.0},
-		}); err != nil {
-			return err
-		}
+		return mc.HandleAuthorize(event)
 	case "mining.submit":
-		mc.log("found block")
-		res := mc.server.SubmitResult(event)
-		if err := mc.SendResult(*res); err != nil {
-			return err
-		}
+		return mc.HandleSubmit(event)
 	}
 	return nil
 }
 
-func checkDisconnect(err error) bool {
-	if err == nil {
-		return false
+func (mc *MinerConnection) HandleSubmit(event *StratumEvent) error {
+	mc.log("found block")
+	jobId, ok := event.Params[1].(string)
+	if !ok {
+		log.Printf("unexpected type for param 1: %+v", event.Params...)
+		return nil
 	}
-	if errors.Is(err, io.EOF) {
-		return true
+	block, exists := mc.jobs[jobId]
+	if !exists {
+		mc.log(fmt.Sprintf("job does not exist: %+v", event.Params...))
+		return nil
 	}
-	if errors.Is(err, syscall.EPIPE) {
-		return true
+	res := mc.server.SubmitResult(block, event)
+	return mc.SendResult(*res)
+}
+
+func (mc *MinerConnection) HandleAuthorize(event *StratumEvent) error {
+	if len(event.Params) < 1 {
+		return fmt.Errorf("malformed event from miner, expected param[1] to be address")
 	}
-	if errors.Is(err, syscall.ECONNRESET) {
-		return true
+	address, ok := event.Params[0].(string)
+	if !ok {
+		return fmt.Errorf("malformed event from miner, expected param[1] to be address string")
 	}
-	return false
+
+	split := strings.Split(address, ".")
+	if len(split) > 1 {
+		mc.log(fmt.Sprintf("mapped %s to worker %s, replacing tag", mc.tag, split[1]))
+		mc.tag = split[1]
+		address = split[0]
+	}
+	mc.minerAddress = address
+	mc.log(fmt.Sprintf("authorizing -> %s", address))
+	nonce := rand.Uint32() // two bytes
+	// extra noonce
+	if err := mc.SendEvent(StratumEvent{
+		Version: "2.0",
+		Method:  "mining.set_extranonce",
+		Params:  []any{nonce, 4},
+	}); err != nil {
+		return err
+	}
+	// send a default diff, we'll calculate the actual diff later when
+	// a new block template is ready
+	if err := mc.SendEvent(StratumEvent{
+		Version: "2.0",
+		Method:  "mining.set_difficulty",
+		Params:  []any{5.0},
+	}); err != nil {
+		return err
+	}
+	if err := mc.SendResult(StratumResult{
+		Version: "2.0",
+		Id:      event.Id,
+		Result:  true,
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (mc *MinerConnection) SendEvent(res StratumEvent) error {
@@ -162,7 +199,28 @@ func (mc *MinerConnection) SendResult(res StratumResult) error {
 	return err
 }
 
-func (mc *MinerConnection) NewBlockTemplate(job BlockJob, diff float64) {
+func (mc *MinerConnection) NewBlockAvailable() {
+	template, err := mc.server.kaspad.GetBlockTemplate(mc.minerAddress, `"kaspa-stratum-bridge=["onemorebsmith"]`)
+	if err != nil {
+		mc.log(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
+		return
+	}
+	blockCounter++
+	blockId := blockCounter % 128
+	mc.jobs[fmt.Sprintf("%d", blockId)] = template.Block
+
+	diff := CalculateTarget(uint64(template.Block.Header.Bits))
+	job := BlockJob{
+		Timestamp: template.Block.Header.Timestamp,
+		JobId:     blockId,
+	}
+	job.Header, err = SerializeBlockHeader(template.Block)
+	if err != nil {
+		mc.log(fmt.Sprintf("failed to serialize block header: %s", err))
+		return
+	}
+	job.Jobs = GenerateJobHeader(job.Header)
+
 	if mc.diff != diff {
 		// new difficulty level, update the client
 		mc.diff = diff
@@ -185,4 +243,20 @@ func (mc *MinerConnection) NewBlockTemplate(job BlockJob, diff float64) {
 	}); err != nil {
 		mc.log(err.Error())
 	}
+}
+
+func checkDisconnect(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	if errors.Is(err, syscall.EPIPE) {
+		return true
+	}
+	if errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
+	return false
 }

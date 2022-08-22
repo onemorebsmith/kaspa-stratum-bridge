@@ -22,8 +22,6 @@ Modify the config file in ./cmd/bridge/config.yaml with your setup
     stratum_port: 8080
     # kaspad_address: address/port of the rpc server for kaspad, typically 16110
     kaspad_address: localhost:16110
-    # miner_address: address to mine to
-    miner_address: kaspa:{your_address_here}
 ```
 
 run `./kaspabridge` in the `cmd/kaspabridge` directory
