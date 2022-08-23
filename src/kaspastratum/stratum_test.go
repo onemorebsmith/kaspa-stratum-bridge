@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/kaspanet/kaspad/app/appmessage"
+	"github.com/kaspanet/kaspad/util/difficulty"
 )
 
 func TestHeaderSerialization(t *testing.T) {
@@ -38,7 +41,20 @@ func TestHeaderSerialization(t *testing.T) {
 
 	// expected diff: 12617.375671633985 (approx)
 	diff := CalculateTarget(453325233)
-	if diff < 12617 || diff > 12618 {
-		t.Errorf("wrong difficulty calculated, expected ~12617.375671633985, got %f", diff)
+	little := BigDiffToLittle(&diff)
+	if little < 12617 || little > 12618 {
+		t.Errorf("wrong difficulty calculated, expected ~12617.375671633985, got %f", little)
 	}
+}
+
+func TestPoolHzCalculation(t *testing.T) {
+	log.Println(shareValue)
+	log.Println(fixedDifficulty)
+	rate := big.Int{} // 1mhz
+	rate.SetUint64(1)
+	rate.Lsh(&rate, 222)
+	dd := BigDiffToLittle(&rate)
+	log.Println(dd)
+	//rate.Sub(&rate, big.NewInt(1000000))
+	log.Println(difficulty.GetHashrateString(&rate, time.Second*1))
 }

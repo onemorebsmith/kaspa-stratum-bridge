@@ -12,6 +12,15 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
+// Diff magic numbers:
+// these are a pair, if you change one you need to change the other
+const diffPower = 34
+const shareValue = float64(2<<(diffPower-1)) / float64(1000000000) // in GH/s
+
+// 🤮 -- difficulty is a decreasing value, so the actual diff val is based on the inverse
+// of the power that we actually want. See the notes in kaspad, they're more coherent
+var fixedDifficulty = BigDiffToLittle(new(big.Int).Lsh(big.NewInt(1), 256-diffPower))
+
 func SerializeBlockHeader(template *appmessage.RPCBlock) ([]byte, error) {
 	hasher, err := blake2b.New(32, []byte("BlockHash"))
 	if err != nil {
@@ -89,7 +98,7 @@ func GenerateJobHeader(headerData []byte) []uint64 {
 
 var bi = big.NewInt(16777215)
 
-func CalculateTarget(bits uint64) float64 {
+func CalculateTarget(bits uint64) big.Int {
 	truncated := uint64(bits) >> 24
 	mantissa := bits & bi.Uint64()
 	exponent := uint64(0)
@@ -99,15 +108,19 @@ func CalculateTarget(bits uint64) float64 {
 		exponent = 8 * ((bits >> 24) - 3)
 	}
 
+	// actual final diff (mant << exp)
+	diff := big.Int{}
+	diff.SetUint64(mantissa)
+	diff.Lsh(&diff, uint(exponent))
+
+	return diff
+}
+
+func BigDiffToLittle(diff *big.Int) float64 {
 	// this is constant
 	numerator := &big.Int{}
 	numerator.SetUint64(2)
 	numerator.Lsh(numerator, 254)
-
-	// actual final diff (mant << exp)
-	diff := &big.Int{}
-	diff.SetUint64(mantissa)
-	diff.Lsh(diff, uint(exponent))
 
 	final := big.Float{}
 	final.SetInt(numerator)
@@ -118,8 +131,6 @@ func CalculateTarget(bits uint64) float64 {
 	tempA.SetInt64(2 << 30)
 	final = *final.Quo(&final, &tempA)
 	d, _ := final.Float64()
-	//log.Printf("%f", d)
-
 	return d
 }
 

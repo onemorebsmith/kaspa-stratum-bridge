@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/big"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,14 +19,18 @@ import (
 type BridgeConfig struct {
 	StratumPort string `yaml:"stratum_port"`
 	RPCServer   string `yaml:"kaspad_address"`
+	PrintStats  bool   `yaml:"print_stats"`
 }
 
 type StratumServer struct {
-	newBlockChan chan struct{}
-	cfg          BridgeConfig
-	kaspad       *rpcclient.RPCClient
-	clients      map[string]*MinerConnection
-	clientLock   sync.RWMutex
+	cfg         BridgeConfig
+	kaspad      *rpcclient.RPCClient
+	clients     map[string]*MinerConnection
+	clientLock  sync.RWMutex
+	blocksFound int64
+	stales      int64
+	rejections  int64
+	disconnects int64
 }
 
 func (mc *StratumServer) log(msg string) {
@@ -40,7 +45,7 @@ func (s *StratumServer) spawnClient(conn net.Conn) {
 	go remote.RunStratum(s)
 }
 
-func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
+func ListenAndServe(cfg BridgeConfig) error {
 	s := &StratumServer{
 		cfg:        cfg,
 		clientLock: sync.RWMutex{},
@@ -48,54 +53,26 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 	}
 	client, err := rpcclient.NewRPCClient(cfg.RPCServer)
 	if err != nil {
-		s.log(fmt.Sprintf("fatal: failed to connect to kaspa server: %s", err))
+		return err
 	}
 	s.kaspad = client
 
-	go func() {
-		const tickerTime = 1000 * time.Millisecond
-		ticker := time.NewTicker(tickerTime)
-		for {
-			select {
-			case <-s.newBlockChan:
-				s.newBlockReady()
-				ticker.Reset(tickerTime)
-			case <-ticker.C: // timeout, manually check for new blocks
-				s.newBlockReady()
-			}
-		}
-	}()
+	s.waitForSync()
+	s.log("kaspa node is fully synced, starting bridge")
+	go s.startBlockTemplateListener()
 
+	// net listener below here
 	server, err := net.Listen("tcp", cfg.StratumPort)
 	if err != nil {
-		return nil, errors.Wrap(err, "error listening")
+		return errors.Wrap(err, "error listening")
 	}
 	defer server.Close()
-	for {
-		clientInfo, err := client.GetInfo()
-		if err != nil {
-			return nil, errors.Wrapf(err, "error fetching server info from kaspad @ %s", cfg.RPCServer)
-		}
-		if clientInfo.IsSynced {
-			break
-		}
 
-		s.log("Kaspa is not synced, waiting for sync before starting bridge")
-		time.Sleep(5 * time.Second)
-	}
-	s.log("Kaspa synced, starting bridge")
-
-	err = client.RegisterForNewBlockTemplateNotifications(func(_ *appmessage.NewBlockTemplateNotificationMessage) {
-		select {
-		case s.newBlockChan <- struct{}{}:
-		default:
-		}
-	})
-	if err != nil {
-		return s, errors.Wrap(err, "fatal: failed to register for block notifications from kaspa")
+	if cfg.PrintStats {
+		go s.startStatsThread()
 	}
 
-	for {
+	for { // listen and spin forever
 		connection, err := server.Accept()
 		if err != nil {
 			s.log(fmt.Sprintf("failed to accept incoming connection: %s", err))
@@ -105,23 +82,8 @@ func ListenAndServe(cfg BridgeConfig) (*StratumServer, error) {
 	}
 }
 
-type BlockJob struct {
-	Header    []byte
-	Jobs      []uint64
-	Timestamp int64
-	JobId     int
-}
-
-func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, incoming *StratumEvent) *StratumResult {
+func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, nonce *big.Int) *StratumResult {
 	s.log("submitting block to kaspad")
-	noncestr, ok := incoming.Params[2].(string)
-	if !ok {
-		s.log(fmt.Sprintf("unexpected type for param 2: %+v", incoming.Params...))
-		return nil
-	}
-	noncestr = strings.Replace(noncestr, "0x", "", 1)
-	nonce := big.Int{}
-	nonce.SetString(noncestr, 16)
 	s.log(fmt.Sprintf("Submitting nonce: %d", nonce.Uint64()))
 	converted, err := appmessage.RPCBlockToDomainBlock(block)
 	if err != nil {
@@ -139,22 +101,26 @@ func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, incoming *Strat
 	switch msg {
 	default:
 		s.log("[Server] block accepted!!")
+		s.blocksFound++
 		return &StratumResult{
 			Result: true,
 		}
 	case appmessage.RejectReasonNone:
+		s.blocksFound++
 		s.log("[Server] block accepted!!")
 		return &StratumResult{
 			Result: true,
 		}
 		// :)
 	case appmessage.RejectReasonBlockInvalid:
+		s.rejections++
 		s.log("[Server] block reject, unknown issue (probably bad pow)")
 		// :'(
 		return &StratumResult{
 			Result: []any{20, "Unknown problem", nil},
 		}
 	case appmessage.RejectReasonIsInIBD:
+		s.stales++
 		s.log("[Server] block reject, stale")
 		// stale
 		return &StratumResult{
@@ -169,12 +135,81 @@ func (s *StratumServer) disconnected(mc *MinerConnection) {
 	s.clientLock.Lock()
 	delete(s.clients, mc.connection.RemoteAddr().String())
 	s.clientLock.Unlock()
+	s.disconnects++
 }
 
-func (s *StratumServer) newBlockReady() {
-	s.clientLock.RLock()
-	defer s.clientLock.RUnlock()
-	for _, v := range s.clients {
-		go v.NewBlockAvailable()
+func (s *StratumServer) startBlockTemplateListener() {
+	blockReadyChan := make(chan bool)
+	err := s.kaspad.RegisterForNewBlockTemplateNotifications(func(_ *appmessage.NewBlockTemplateNotificationMessage) {
+		blockReadyChan <- true
+	})
+	if err != nil {
+		s.log("fatal: failed to register for block notifications from kaspa")
+	}
+
+	blockReady := func() {
+		s.clientLock.Lock()
+		defer s.clientLock.Unlock()
+		for _, v := range s.clients {
+			if v != nil { // this shouldn't happen but apparently it did
+				go v.NewBlockAvailable()
+			}
+		}
+	}
+
+	const tickerTime = 1000 * time.Millisecond
+	ticker := time.NewTicker(tickerTime)
+	for {
+		select {
+		case <-blockReadyChan:
+			blockReady()
+			ticker.Reset(tickerTime)
+		case <-ticker.C: // timeout, manually check for new blocks
+			blockReady()
+		}
+	}
+}
+
+func (s *StratumServer) waitForSync() error {
+	for {
+		clientInfo, err := s.kaspad.GetInfo()
+		if err != nil {
+			return errors.Wrapf(err, "error fetching server info from kaspad @ %s", s.cfg.RPCServer)
+		}
+		if clientInfo.IsSynced {
+			break
+		}
+		s.log("Kaspa is not synced, waiting for sync before starting bridge")
+		time.Sleep(5 * time.Second)
+	}
+	return nil
+}
+
+func (s *StratumServer) startStatsThread() error {
+	start := time.Now()
+	for {
+		time.Sleep(10 * time.Second)
+		s.clientLock.RLock()
+		str := "\n========================================================\n"
+		str += fmt.Sprintf("uptime %s | mined %d | stales %d | reject %d | disconn: %d\n",
+			time.Since(start).Round(time.Second), s.blocksFound, s.stales, s.rejections, s.disconnects)
+		str += "--------------------------------------------------------\n"
+		str += "worker\t| avg hashrate\t| shares\t| uptime\n"
+		str += "--------------------------------------------------------\n"
+		var lines []string
+		totalRate := float64(0)
+		for _, v := range s.clients {
+			rate := v.GetAverageHashrateGHz()
+			totalRate += rate
+			lines = append(lines, fmt.Sprintf("%s\t| %0.2fGH/s\t| %d\t| %s",
+				v.tag, v.GetAverageHashrateGHz(), v.sharesFound, time.Since(v.startTime).Round(time.Second)))
+		}
+		sort.Strings(lines)
+		str += strings.Join(lines, "\n")
+		str += "\n--------------------------------------------------------\n"
+		str += fmt.Sprintf("total\t| %0.2fGH/s", totalRate)
+		str += "\n========================================================\n"
+		s.clientLock.RUnlock()
+		log.Println(str)
 	}
 }

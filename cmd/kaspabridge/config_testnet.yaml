@@ -1,4 +1,0 @@
-# stratum_listen_port: the port that will be listening for incoming stratum traffic
-stratum_port: 8080
-# kaspad_address: address/port of the rpc server for kaspad, typically 16110
-kaspad_address: 144.76.19.91:30120
