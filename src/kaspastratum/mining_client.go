@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"sync"
 	"syscall"
 	"time"
 
@@ -27,6 +28,7 @@ type MinerConnection struct {
 	minerAddress string
 	bigDiff      big.Int
 
+	jobLock     sync.Mutex
 	jobs        map[string]*appmessage.RPCBlock
 	sharesFound int64
 	startTime   time.Time
@@ -70,6 +72,7 @@ func NewConnection(connection net.Conn, server *StratumServer) *MinerConnection 
 		connection: connection,
 		server:     server,
 		tag:        connection.RemoteAddr().String(),
+		jobLock:    sync.Mutex{},
 		jobs:       make(map[string]*appmessage.RPCBlock),
 		startTime:  time.Now(),
 	}
@@ -125,7 +128,9 @@ func (mc *MinerConnection) HandleSubmit(event *StratumEvent) error {
 		log.Printf("unexpected type for param 1: %+v", event.Params...)
 		return nil
 	}
+	mc.jobLock.Lock()
 	block, exists := mc.jobs[jobId]
+	mc.jobLock.Unlock()
 	if !exists {
 		mc.log(fmt.Sprintf("job does not exist: %+v", event.Params...))
 		return nil
@@ -256,7 +261,9 @@ func (mc *MinerConnection) NewBlockAvailable() {
 	}
 	blockCounter++
 	blockId := blockCounter % 128
+	mc.jobLock.Lock()
 	mc.jobs[fmt.Sprintf("%d", blockId)] = template.Block
+	mc.jobLock.Unlock()
 
 	mc.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
 	job := BlockJob{
