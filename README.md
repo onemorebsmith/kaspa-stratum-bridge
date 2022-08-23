@@ -11,7 +11,7 @@ Shares-based work allocation with periodic stat output:
 ![image](https://user-images.githubusercontent.com/59971111/186201915-a9d0bbc3-9a21-474b-8240-5e4b2b1ed7bb.png)
 
 
-Tested on x64 macos & ubuntu w/ lolminer and SRBMiner
+Tested on windows, x64 macos & ubuntu w/ lolminer and SRBMiner
 
 No fee, forever. Do what you want with it. 
 
