@@ -256,6 +256,11 @@ func (mc *MinerConnection) SendResult(res StratumResult) error {
 }
 
 func (mc *MinerConnection) NewBlockAvailable() {
+	if mc.minerAddress == "" {
+		mc.log("miner is not ready, skipping block")
+		return
+	}
+
 	template, err := mc.server.kaspad.GetBlockTemplate(mc.minerAddress, `"kaspa-stratum-bridge=["onemorebsmith"]`)
 	if err != nil {
 		mc.log(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
