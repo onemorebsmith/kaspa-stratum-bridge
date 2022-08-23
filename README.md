@@ -1,9 +1,17 @@
 # Kaspa Stratum/GRPC bridge
-This is an daemon that listens for incoming stratum connections from miners and does the translation between stratum events and the expected events from kaspad. This allows solo-mining kaspa with a local node (or on a public node) while mining with stratum-based miners such as lolminer.
+This is an daemon that allows mining to a local (or remote) kaspa node using stratum-base miners. 
 
-2-3ms response time via `stratum-ping` using a local node and remote miner
 
-Tested on x64 macos & ubuntu w/ lolminer
+2-3ms response time using local node and remote miner:
+
+![image](https://user-images.githubusercontent.com/59971111/186201719-be398c46-f861-4c45-a4aa-5264ad084566.png)
+
+Shares-based work allocation with periodic stat output:
+
+![image](https://user-images.githubusercontent.com/59971111/186201915-a9d0bbc3-9a21-474b-8240-5e4b2b1ed7bb.png)
+
+
+Tested on x64 macos & ubuntu w/ lolminer and SRBMiner
 
 No fee, forever. Do what you want with it. 
 
@@ -11,6 +19,8 @@ Huge shoutout to https://github.com/KaffinPX/KStratum for the inspiration
 
 # Install
 ## Docker
+
+Note: This does not require pulling down the repo, it only requires that docker is installed.
 
 `docker run -p 5555:5555 onemorebsmith/kaspa_bridge` will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections. 
 
@@ -37,10 +47,9 @@ run `./kaspabridge` in the `cmd/kaspabridge` directory
 all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 
 # TODO
-* Docker
-* Command-line flags support
-* 'Pool'-like process, issue smaller diff to miners
 * Discord/telegram notifications
+* WebUI of some sort
+* System-level tests
 
 
 
