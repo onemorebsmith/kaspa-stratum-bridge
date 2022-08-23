@@ -28,10 +28,11 @@ type MinerConnection struct {
 	minerAddress string
 	bigDiff      big.Int
 
-	jobLock     sync.Mutex
-	jobs        map[string]*appmessage.RPCBlock
-	sharesFound int64
-	startTime   time.Time
+	jobLock      sync.Mutex
+	jobs         map[string]*appmessage.RPCBlock
+	sharesFound  int64
+	startTime    time.Time
+	blockCounter int
 }
 
 type BlockJob struct {
@@ -163,6 +164,7 @@ func (mc *MinerConnection) HandleSubmit(event *StratumEvent) error {
 	}
 
 	return mc.SendResult(StratumResult{
+		Id:     event.Id,
 		Result: true,
 	})
 }
@@ -259,8 +261,8 @@ func (mc *MinerConnection) NewBlockAvailable() {
 		mc.log(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
 		return
 	}
-	blockCounter++
-	blockId := blockCounter % 128
+	mc.blockCounter++
+	blockId := mc.blockCounter % 128
 	mc.jobLock.Lock()
 	mc.jobs[fmt.Sprintf("%d", blockId)] = template.Block
 	mc.jobLock.Unlock()
@@ -276,6 +278,7 @@ func (mc *MinerConnection) NewBlockAvailable() {
 		return
 	}
 	job.Jobs = GenerateJobHeader(job.Header)
+	// mc.log(fmt.Sprintf("sending job %d, %s", job.JobId, time.Unix(job.Timestamp, 0)))
 
 	// normal notify flow
 	if err := mc.SendEvent(StratumEvent{

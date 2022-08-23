@@ -129,8 +129,6 @@ func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, nonce *big.Int)
 	}
 }
 
-var blockCounter = 0
-
 func (s *StratumServer) disconnected(mc *MinerConnection) {
 	s.clientLock.Lock()
 	delete(s.clients, mc.connection.RemoteAddr().String())
@@ -157,7 +155,7 @@ func (s *StratumServer) startBlockTemplateListener() {
 		}
 	}
 
-	const tickerTime = 1000 * time.Millisecond
+	const tickerTime = 500 * time.Millisecond
 	ticker := time.NewTicker(tickerTime)
 	for {
 		select {
