@@ -148,10 +148,12 @@ func (s *StratumServer) startBlockTemplateListener() {
 	}
 
 	blockReady := func() {
-		s.clientLock.RLock()
-		defer s.clientLock.RUnlock()
+		s.clientLock.Lock()
+		defer s.clientLock.Unlock()
 		for _, v := range s.clients {
-			go v.NewBlockAvailable()
+			if v != nil { // this shouldn't happen but apparently it did
+				go v.NewBlockAvailable()
+			}
 		}
 	}
 

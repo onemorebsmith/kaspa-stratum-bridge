@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"io/ioutil"
 	"log"
 	"os"
@@ -11,6 +12,7 @@ import (
 )
 
 func main() {
+
 	log.SetOutput(os.Stdout)
 
 	pwd, _ := os.Getwd()
@@ -26,6 +28,12 @@ func main() {
 		log.Printf("failed parsing config file: %s", err)
 		os.Exit(1)
 	}
+
+	flag.StringVar(&cfg.StratumPort, "stratum", cfg.StratumPort, "stratum port to listen on, default `:5555`")
+	flag.BoolVar(&cfg.PrintStats, "stats", cfg.PrintStats, "true to show periodic stats to console, default `true`")
+	flag.StringVar(&cfg.RPCServer, "kaspa", cfg.RPCServer, "address of the kaspad node, default `localhost:16110`")
+	flag.Parse()
+
 	log.Println("----------------------------------")
 	log.Printf("initializing bridge")
 	log.Printf("\tkaspad:      %s", cfg.RPCServer)
