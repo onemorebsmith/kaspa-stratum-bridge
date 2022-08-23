@@ -12,6 +12,15 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
+// Diff magic numbers:
+// these are a pair, if you change one you need to change the other
+const diffPower = 34
+const shareValue = float64(2<<(diffPower-1)) / float64(1000000000) // in GH/s
+
+// 🤮 -- difficulty is a decreasing value, so the actual diff val is based on the inverse
+// of the power that we actually want. See the notes in kaspad, they're more coherent
+var fixedDifficulty = BigDiffToLittle(new(big.Int).Lsh(big.NewInt(1), 256-diffPower))
+
 func SerializeBlockHeader(template *appmessage.RPCBlock) ([]byte, error) {
 	hasher, err := blake2b.New(32, []byte("BlockHash"))
 	if err != nil {

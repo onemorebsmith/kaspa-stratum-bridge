@@ -39,8 +39,6 @@ type BlockJob struct {
 	JobId     int
 }
 
-const shareValue = 17.17 // GHz
-
 func (mc *MinerConnection) log(msg string) {
 	log.Printf("[%s] %s", mc.tag, msg)
 }
@@ -203,7 +201,7 @@ func (mc *MinerConnection) HandleAuthorize(event *StratumEvent) error {
 	if err := mc.SendEvent(StratumEvent{
 		Version: "2.0",
 		Method:  "mining.set_difficulty",
-		Params:  []any{4.0},
+		Params:  []any{fixedDifficulty},
 	}); err != nil {
 		return err
 	}
