@@ -3,8 +3,10 @@ package kaspastratum
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"syscall"
+	"time"
 
 	"io"
 	"log"
@@ -13,6 +15,7 @@ import (
 	"sync/atomic"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
+	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
 	"github.com/pkg/errors"
 )
 
@@ -20,12 +23,23 @@ type MinerConnection struct {
 	connection   net.Conn
 	counter      int32
 	server       *StratumServer
-	diff         float64
 	tag          string
 	minerAddress string
+	bigDiff      big.Int
 
-	jobs map[string]*appmessage.RPCBlock
+	jobs        map[string]*appmessage.RPCBlock
+	sharesFound int64
+	startTime   time.Time
 }
+
+type BlockJob struct {
+	Header    []byte
+	Jobs      []uint64
+	Timestamp int64
+	JobId     int
+}
+
+const shareValue = 17.17 // GHz
 
 func (mc *MinerConnection) log(msg string) {
 	log.Printf("[%s] %s", mc.tag, msg)
@@ -59,6 +73,7 @@ func NewConnection(connection net.Conn, server *StratumServer) *MinerConnection 
 		server:     server,
 		tag:        connection.RemoteAddr().String(),
 		jobs:       make(map[string]*appmessage.RPCBlock),
+		startTime:  time.Now(),
 	}
 }
 
@@ -75,7 +90,6 @@ func (mc *MinerConnection) RunStratum(s *StratumServer) {
 			return
 		}
 		for _, e := range events {
-			mc.log(fmt.Sprintf("[stratum] received %s", e.Method))
 			if err := mc.processEvent(e); err != nil {
 				mc.log(err.Error())
 				return
@@ -87,8 +101,6 @@ func (mc *MinerConnection) RunStratum(s *StratumServer) {
 func (mc *MinerConnection) processEvent(event *StratumEvent) error {
 	switch event.Method {
 	case "mining.subscribe":
-		mc.log("subscribed")
-		// me : `{"id":1,"jsonrpc":"2.0","results":[true,"EthereumStratum/1.0.0"]}`
 		err := mc.SendResult(StratumResult{
 			Version: "2.0",
 			Id:      event.Id,
@@ -106,7 +118,10 @@ func (mc *MinerConnection) processEvent(event *StratumEvent) error {
 }
 
 func (mc *MinerConnection) HandleSubmit(event *StratumEvent) error {
-	mc.log("found block")
+	if len(event.Params) < 2 {
+		log.Printf("malformed event, expected at least 2 params")
+		return nil
+	}
 	jobId, ok := event.Params[1].(string)
 	if !ok {
 		log.Printf("unexpected type for param 1: %+v", event.Params...)
@@ -117,8 +132,44 @@ func (mc *MinerConnection) HandleSubmit(event *StratumEvent) error {
 		mc.log(fmt.Sprintf("job does not exist: %+v", event.Params...))
 		return nil
 	}
-	res := mc.server.SubmitResult(block, event)
-	return mc.SendResult(*res)
+	noncestr, ok := event.Params[2].(string)
+	if !ok {
+		mc.log(fmt.Sprintf("unexpected type for param 2: %+v", event.Params...))
+		return nil
+	}
+	noncestr = strings.Replace(noncestr, "0x", "", 1)
+	nonce := big.Int{}
+	nonce.SetString(noncestr, 16)
+
+	converted, err := appmessage.RPCBlockToDomainBlock(block)
+	if err != nil {
+		mc.log(fmt.Sprintf("failed to cast block to mutable block: %+v", err))
+	}
+	mutableHeader := converted.Header.ToMutable()
+	mutableHeader.SetNonce(nonce.Uint64())
+	powState := pow.NewState(mutableHeader)
+	powValue := powState.CalculateProofOfWorkValue()
+
+	mc.sharesFound++
+
+	// The block hash must be less or equal than the claimed target.
+	if powValue.Cmp(&powState.Target) <= 0 {
+		mc.log("found block")
+		res := mc.server.SubmitResult(block, &nonce)
+		return mc.SendResult(*res)
+	}
+
+	return mc.SendResult(StratumResult{
+		Result: true,
+	})
+}
+
+func (mc *MinerConnection) GetShares() int64 {
+	return mc.sharesFound
+}
+
+func (mc *MinerConnection) GetAverageHashrateGHz() float64 {
+	return (float64(mc.sharesFound) * shareValue) / time.Since(mc.startTime).Seconds()
 }
 
 func (mc *MinerConnection) HandleAuthorize(event *StratumEvent) error {
@@ -152,7 +203,7 @@ func (mc *MinerConnection) HandleAuthorize(event *StratumEvent) error {
 	if err := mc.SendEvent(StratumEvent{
 		Version: "2.0",
 		Method:  "mining.set_difficulty",
-		Params:  []any{5.0},
+		Params:  []any{4.0},
 	}); err != nil {
 		return err
 	}
@@ -209,7 +260,7 @@ func (mc *MinerConnection) NewBlockAvailable() {
 	blockId := blockCounter % 128
 	mc.jobs[fmt.Sprintf("%d", blockId)] = template.Block
 
-	diff := CalculateTarget(uint64(template.Block.Header.Bits))
+	mc.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
 	job := BlockJob{
 		Timestamp: template.Block.Header.Timestamp,
 		JobId:     blockId,
@@ -220,19 +271,6 @@ func (mc *MinerConnection) NewBlockAvailable() {
 		return
 	}
 	job.Jobs = GenerateJobHeader(job.Header)
-
-	if mc.diff != diff {
-		// new difficulty level, update the client
-		mc.diff = diff
-		if err := mc.SendEvent(StratumEvent{
-			Version: "2.0",
-			Method:  "mining.set_difficulty",
-			Id:      job.JobId,
-			Params:  []any{diff},
-		}); err != nil {
-			mc.log(err.Error())
-		}
-	}
 
 	// normal notify flow
 	if err := mc.SendEvent(StratumEvent{

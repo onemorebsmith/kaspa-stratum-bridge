@@ -30,9 +30,10 @@ func main() {
 	log.Printf("initializing bridge")
 	log.Printf("\tkaspad:      %s", cfg.RPCServer)
 	log.Printf("\tstratum:     %s", cfg.StratumPort)
+	log.Printf("\tstats:       %t", cfg.PrintStats)
 	log.Println("----------------------------------")
 
-	if _, err := kaspastratum.ListenAndServe(cfg); err != nil {
+	if err := kaspastratum.ListenAndServe(cfg); err != nil {
 		log.Println(err)
 	}
 }

@@ -38,7 +38,8 @@ func TestHeaderSerialization(t *testing.T) {
 
 	// expected diff: 12617.375671633985 (approx)
 	diff := CalculateTarget(453325233)
-	if diff < 12617 || diff > 12618 {
-		t.Errorf("wrong difficulty calculated, expected ~12617.375671633985, got %f", diff)
+	little := BigDiffToLittle(&diff)
+	if little < 12617 || little > 12618 {
+		t.Errorf("wrong difficulty calculated, expected ~12617.375671633985, got %f", little)
 	}
 }
