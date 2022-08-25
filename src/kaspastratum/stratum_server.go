@@ -1,6 +1,7 @@
 package kaspastratum
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/big"
@@ -13,7 +14,11 @@ import (
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
+	"github.com/mattn/go-colorable"
+	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type BridgeConfig struct {
@@ -46,40 +51,24 @@ func (s *StratumServer) spawnClient(conn net.Conn) {
 }
 
 func ListenAndServe(cfg BridgeConfig) error {
-	s := &StratumServer{
-		cfg:        cfg,
-		clientLock: sync.RWMutex{},
-		clients:    make(map[string]*MinerConnection),
-	}
-	client, err := rpcclient.NewRPCClient(cfg.RPCServer)
-	if err != nil {
-		return err
-	}
-	s.kaspad = client
+	zapCfg := zap.NewDevelopmentEncoderConfig()
+	zapCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zapCfg),
+		zapcore.AddSync(colorable.NewColorableStdout()),
+		zapcore.DebugLevel,
+	))
 
-	s.waitForSync()
-	s.log("kaspa node is fully synced, starting bridge")
-	go s.startBlockTemplateListener()
-
-	// net listener below here
-	server, err := net.Listen("tcp", cfg.StratumPort)
-	if err != nil {
-		return errors.Wrap(err, "error listening")
-	}
-	defer server.Close()
-
-	if cfg.PrintStats {
-		go s.startStatsThread()
+	stratumConfig := gostratum.StratumListenerConfig{
+		Port:           cfg.StratumPort,
+		HandlerMap:     gostratum.DefaultHandlers(),
+		StateGenerator: gostratum.MiningStateGenerator,
+		Logger:         logger,
 	}
 
-	for { // listen and spin forever
-		connection, err := server.Accept()
-		if err != nil {
-			s.log(fmt.Sprintf("failed to accept incoming connection: %s", err))
-			continue
-		}
-		s.spawnClient(connection)
-	}
+	server := gostratum.NewListener(stratumConfig)
+	server.Listen(context.Background())
+	return nil
 }
 
 func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, nonce *big.Int) *StratumResult {

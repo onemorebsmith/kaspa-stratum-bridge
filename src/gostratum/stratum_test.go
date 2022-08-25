@@ -27,7 +27,7 @@ func testLogger() *zap.Logger {
 func TestAcceptContextLifetime(t *testing.T) {
 	logger := testLogger()
 
-	listener := NewListener(":12345", logger, DefaultHandlers())
+	listener := NewListener(DefaultConfig(logger))
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 
 	defer cancel()
@@ -36,17 +36,12 @@ func TestAcceptContextLifetime(t *testing.T) {
 
 func TestNewClient(t *testing.T) {
 	logger := testLogger()
-	listener := NewListener(":12345", logger, DefaultHandlers())
-
-	called := false
+	listener := NewListener(DefaultConfig(logger))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	mc := testmocks.NewMockConnection()
 	listener.newClient(ctx, mc)
-	if !called {
-		t.Fatalf("callback not called properly")
-	}
 	// send in the authorize event
 	mc.AsyncWriteTestDataToReadBuffer(testmocks.NewAuthorizeEvent())
 

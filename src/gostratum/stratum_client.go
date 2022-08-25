@@ -17,7 +17,7 @@ type StratumClient interface {
 	OnAuthorize(ctx StratumContext, params []any)
 }
 
-func spawnClientListener(ctx StratumContext, connection net.Conn, s *StratumListener) error {
+func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumListener) error {
 	defer func() {
 		connection.Close()
 		s.disconnectChannel <- ctx

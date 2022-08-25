@@ -16,6 +16,7 @@ type StratumContext struct {
 	RemoteAddr string
 	Logger     *zap.Logger
 	connection net.Conn
+	State      any // gross, but go generics aren't mature enough this can be typed 😭
 }
 
 func (sc *StratumContext) Reply(response stratumrpc.JsonRpcResponse) error {

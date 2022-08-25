@@ -3,7 +3,28 @@ package gostratum
 import (
 	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
+
+type MiningState struct {
+}
+
+func DefaultConfig(logger *zap.Logger) StratumListenerConfig {
+	return StratumListenerConfig{
+		StateGenerator: MiningStateGenerator,
+		HandlerMap:     DefaultHandlers(),
+		Port:           ":5555",
+		Logger:         logger,
+	}
+}
+
+func MiningStateGenerator() any {
+	return &MiningState{}
+}
+
+func GetMiningState(ctx *StratumContext) *MiningState {
+	return ctx.State.(*MiningState)
+}
 
 func DefaultHandlers() StratumHandlerMap {
 	return StratumHandlerMap{
@@ -13,7 +34,7 @@ func DefaultHandlers() StratumHandlerMap {
 	}
 }
 
-func HandleAuthorize(ctx StratumContext, event stratumrpc.JsonRpcEvent) error {
+func HandleAuthorize(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
 	if err := ctx.Reply(stratumrpc.NewResponse(event, true, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to authorize")
 	}
@@ -21,7 +42,7 @@ func HandleAuthorize(ctx StratumContext, event stratumrpc.JsonRpcEvent) error {
 	return nil
 }
 
-func HandleSubscribe(ctx StratumContext, event stratumrpc.JsonRpcEvent) error {
+func HandleSubscribe(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
 	if err := ctx.Reply(stratumrpc.NewResponse(event,
 		[]any{true, "EthereumStratum/1.0.0"}, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to subscribe")
@@ -30,7 +51,7 @@ func HandleSubscribe(ctx StratumContext, event stratumrpc.JsonRpcEvent) error {
 	return nil
 }
 
-func HandleSubmit(ctx StratumContext, event stratumrpc.JsonRpcEvent) error {
+func HandleSubmit(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
 	// stub
 	ctx.Logger.Info("work submission")
 	return nil
