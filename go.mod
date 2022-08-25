@@ -6,6 +6,7 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/kaspanet/kaspad v0.12.6
 	github.com/pkg/errors v0.9.1
+	go.uber.org/zap v1.23.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	gopkg.in/yaml.v2 v2.3.0
 )
@@ -22,7 +23,7 @@ require (
 	github.com/kaspanet/go-secp256k1 v0.0.7 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d // indirect
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
-	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654 // indirect
+	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/text v0.3.5 // indirect
 	google.golang.org/genproto v0.0.0-20210604141403-392c879c8b08 // indirect
 	google.golang.org/grpc v1.38.0 // indirect

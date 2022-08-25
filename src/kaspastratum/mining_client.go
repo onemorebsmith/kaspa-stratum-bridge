@@ -13,7 +13,6 @@ import (
 	"log"
 	"net"
 	"strings"
-	"sync/atomic"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
@@ -21,17 +20,17 @@ import (
 )
 
 type MinerConnection struct {
-	connection   net.Conn
-	counter      int32
-	server       *StratumServer
-	tag          string
-	minerAddress string
-	bigDiff      big.Int
+	connection    net.Conn
+	server        *StratumServer
+	remoteAddress string
+	tag           string
+	minerAddress  string
+	bigDiff       big.Int
 
 	jobLock      sync.Mutex
 	jobs         map[string]*appmessage.RPCBlock
-	sharesFound  int64
 	startTime    time.Time
+	sharesFound  int64
 	blockCounter int
 }
 
@@ -50,7 +49,7 @@ func (mc *MinerConnection) listen() ([]*StratumEvent, error) {
 	buffer := make([]byte, 1024)
 	_, err := mc.connection.Read(buffer)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading from connection %s", mc.connection.RemoteAddr().String())
+		return nil, errors.Wrapf(err, "error reading from connection %s", mc.remoteAddress)
 	}
 	asStr := string(buffer)
 	asStr = strings.ReplaceAll(asStr, "\x00", "")
@@ -70,12 +69,13 @@ func (mc *MinerConnection) listen() ([]*StratumEvent, error) {
 
 func NewConnection(connection net.Conn, server *StratumServer) *MinerConnection {
 	return &MinerConnection{
-		connection: connection,
-		server:     server,
-		tag:        connection.RemoteAddr().String(),
-		jobLock:    sync.Mutex{},
-		jobs:       make(map[string]*appmessage.RPCBlock),
-		startTime:  time.Now(),
+		connection:    connection,
+		server:        server,
+		remoteAddress: connection.RemoteAddr().String(),
+		tag:           connection.RemoteAddr().String(),
+		jobLock:       sync.Mutex{},
+		jobs:          make(map[string]*appmessage.RPCBlock),
+		startTime:     time.Now(),
 	}
 }
 
@@ -224,9 +224,6 @@ func (mc *MinerConnection) HandleAuthorize(event *StratumEvent) error {
 
 func (mc *MinerConnection) SendEvent(res StratumEvent) error {
 	res.Version = "2.0"
-	if res.Id == 0 {
-		res.Id = int(atomic.AddInt32(&mc.counter, 1))
-	}
 	encoded, err := json.Marshal(res)
 	if err != nil {
 		return errors.Wrap(err, "failed encoding stratum result to client")

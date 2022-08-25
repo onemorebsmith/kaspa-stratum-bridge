@@ -40,7 +40,7 @@ func (mc *StratumServer) log(msg string) {
 func (s *StratumServer) spawnClient(conn net.Conn) {
 	remote := NewConnection(conn, s)
 	s.clientLock.Lock()
-	s.clients[conn.RemoteAddr().String()] = remote
+	s.clients[remote.remoteAddress] = remote
 	s.clientLock.Unlock()
 	go remote.RunStratum(s)
 }
@@ -131,9 +131,11 @@ func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, nonce *big.Int)
 
 func (s *StratumServer) disconnected(mc *MinerConnection) {
 	s.clientLock.Lock()
-	delete(s.clients, mc.connection.RemoteAddr().String())
+	if _, exists := s.clients[mc.remoteAddress]; exists {
+		delete(s.clients, mc.remoteAddress)
+		s.disconnects++
+	}
 	s.clientLock.Unlock()
-	s.disconnects++
 }
 
 func (s *StratumServer) startBlockTemplateListener() {
