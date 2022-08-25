@@ -1,55 +1,35 @@
 package gostratum
 
 import (
-	"context"
-	"errors"
-	"fmt"
+	"bufio"
+	"bytes"
 	"net"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 type StratumClient interface {
-	OnAuthorize(params []any)
+	OnAuthorize(ctx StratumContext, params []any)
 }
 
-type StratumClientProtocol struct {
-	connection    net.Conn
-	remoteAddress string
-	logger        *zap.Logger
-	client        StratumClient
-}
-
-func NewClientProtocol(conn net.Conn, logger *zap.Logger) *StratumClientProtocol {
-	addr := conn.RemoteAddr().String()
-	return &StratumClientProtocol{
-		connection:    conn,
-		logger:        logger.With(zap.String("client", conn.RemoteAddr().String())),
-		remoteAddress: addr,
-	}
-}
-
-func (cc *StratumClientProtocol) StartListen(ctx context.Context, client StratumClient) error {
-	cc.client = client
-	if client == nil {
-		return fmt.Errorf("client can not be nil")
-	}
+func spawnClientListener(ctx StratumContext, connection net.Conn, s *StratumListener) error {
+	defer func() {
+		connection.Close()
+		s.disconnectChannel <- ctx
+	}()
 
 	for {
-		err := readFromConnection(cc.connection, func(line string) error {
+		err := readFromConnection(connection, func(line string) error {
 			event, err := stratumrpc.UnmarshalEvent(line)
 			if err != nil {
 				return err
 			}
-
-			switch event.Method {
-			case stratumrpc.StratumMethodAuthorize:
-				client.OnAuthorize(event.Params)
-			}
-
-			return nil
+			return s.HandleEvent(ctx, event)
 		})
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			continue // expected timeout
@@ -58,8 +38,31 @@ func (cc *StratumClientProtocol) StartListen(ctx context.Context, client Stratum
 			return ctx.Err() // context cancelled
 		}
 		if err != nil { // actual error
-			cc.logger.Error("error reading from socket", zap.Error(err))
+			ctx.Logger.Error("error reading from socket", zap.Error(err))
 			return err
 		}
 	}
+}
+
+type LineCallback func(line string) error
+
+func readFromConnection(connection net.Conn, cb LineCallback) error {
+	deadline := time.Now().Add(5 * time.Second).UTC()
+	if err := connection.SetReadDeadline(deadline); err != nil {
+		return err
+	}
+
+	buffer := make([]byte, 1024)
+	_, err := connection.Read(buffer)
+	if err != nil {
+		return errors.Wrapf(err, "error reading from connection")
+	}
+	buffer = bytes.ReplaceAll(buffer, []byte("\x00"), nil)
+	scanner := bufio.NewScanner(strings.NewReader(string(buffer)))
+	for scanner.Scan() {
+		if err := cb(scanner.Text()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
