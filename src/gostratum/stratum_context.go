@@ -3,6 +3,7 @@ package gostratum
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"time"
 
@@ -12,18 +13,24 @@ import (
 )
 
 type StratumContext struct {
-	ctx          context.Context
-	RemoteAddr   string
-	WalletAddr   string
-	WorkerName   string
-	RemoteApp    string
-	Logger       *zap.SugaredLogger
-	connection   net.Conn
-	onDisconnect chan *StratumContext
-	State        any // gross, but go generics aren't mature enough this can be typed 😭
+	ctx           context.Context
+	RemoteAddr    string
+	WalletAddr    string
+	WorkerName    string
+	RemoteApp     string
+	Logger        *zap.SugaredLogger
+	connection    net.Conn
+	disconnecting bool
+	onDisconnect  chan *StratumContext
+	State         any // gross, but go generics aren't mature enough this can be typed 😭
 }
 
+var ErrorDisconnected = fmt.Errorf("disconnecting")
+
 func (sc *StratumContext) Reply(response stratumrpc.JsonRpcResponse) error {
+	if sc.disconnecting {
+		return ErrorDisconnected
+	}
 	encoded, err := json.Marshal(response)
 	if err != nil {
 		return errors.Wrap(err, "failed encoding jsonrpc response")
@@ -35,6 +42,9 @@ func (sc *StratumContext) Reply(response stratumrpc.JsonRpcResponse) error {
 }
 
 func (sc *StratumContext) Send(event stratumrpc.JsonRpcEvent) error {
+	if sc.disconnecting {
+		return ErrorDisconnected
+	}
 	encoded, err := json.Marshal(event)
 	if err != nil {
 		return errors.Wrap(err, "failed encoding jsonrpc event")
@@ -47,6 +57,7 @@ func (sc *StratumContext) Send(event stratumrpc.JsonRpcEvent) error {
 
 func (sc *StratumContext) checkDisconnect(err error) {
 	if err != nil { // actual error
+		sc.disconnecting = true
 		sc.onDisconnect <- sc
 	}
 }

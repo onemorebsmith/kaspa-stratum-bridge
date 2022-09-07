@@ -50,6 +50,7 @@ func NewListener(cfg StratumListenerConfig) *StratumListener {
 		StratumListenerConfig: cfg,
 		clients:               sync.Map{},
 		workerGroup:           sync.WaitGroup{},
+		disconnectChannel:     make(DisconnectChannel),
 	}
 
 	listener.Logger = listener.Logger.With(

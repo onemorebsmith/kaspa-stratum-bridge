@@ -43,7 +43,6 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 
 func (c *clientListener) NewBlockAvailable(kapi *rpcclient.RPCClient) {
 	for _, client := range c.clients {
-
 		state := GetMiningState(client)
 		if client.WalletAddr == "" {
 			continue // not ready
@@ -82,6 +81,9 @@ func (c *clientListener) NewBlockAvailable(kapi *rpcclient.RPCClient) {
 			Id:      jobId,
 			Params:  []any{fmt.Sprintf("%d", jobId), workNonce, template.Block.Header.Timestamp},
 		}); err != nil {
+			if errors.Is(err, gostratum.ErrorDisconnected) {
+				return
+			}
 			client.Logger.Error(errors.Wrap(err, "failed sending work packet").Error())
 		}
 	}
