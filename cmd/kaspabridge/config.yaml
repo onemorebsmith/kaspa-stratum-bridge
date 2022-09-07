@@ -11,3 +11,6 @@ kaspad_address: localhost:16110
 # print_stats: if true will print stats to the console, false just workers
 # joining/disconnecting, blocks found, and errors will be printed
 print_stats: true
+
+# prom_port: if this is specified prometheus will serve stats on the port provided 
+prom_port: :2114

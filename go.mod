@@ -6,9 +6,10 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/kaspanet/kaspad v0.12.6
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.13.0
 	go.uber.org/zap v1.23.0
-	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	gopkg.in/yaml.v2 v2.3.0
+	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (

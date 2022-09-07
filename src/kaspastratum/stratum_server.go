@@ -2,21 +2,11 @@ package kaspastratum
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"math/big"
-	"net"
-	"sort"
-	"strings"
-	"sync"
-	"time"
+	"os"
 
-	"github.com/kaspanet/kaspad/app/appmessage"
-	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
-	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
-	"github.com/pkg/errors"
+	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -24,181 +14,64 @@ import (
 type BridgeConfig struct {
 	StratumPort string `yaml:"stratum_port"`
 	RPCServer   string `yaml:"kaspad_address"`
+	PromPort    string `yaml:"prom_port"`
 	PrintStats  bool   `yaml:"print_stats"`
 }
 
-type StratumServer struct {
-	cfg         BridgeConfig
-	kaspad      *rpcclient.RPCClient
-	clients     map[string]*MinerConnection
-	clientLock  sync.RWMutex
-	blocksFound int64
-	stales      int64
-	rejections  int64
-	disconnects int64
-}
-
-func (mc *StratumServer) log(msg string) {
-	log.Printf("[bridge] %s", msg)
-}
-
-func (s *StratumServer) spawnClient(conn net.Conn) {
-	remote := NewConnection(conn, s)
-	s.clientLock.Lock()
-	s.clients[remote.remoteAddress] = remote
-	s.clientLock.Unlock()
-	go remote.RunStratum(s)
-}
-
 func ListenAndServe(cfg BridgeConfig) error {
-	zapCfg := zap.NewDevelopmentEncoderConfig()
-	zapCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	logger := zap.New(zapcore.NewCore(
-		zapcore.NewConsoleEncoder(zapCfg),
-		zapcore.AddSync(colorable.NewColorableStdout()),
-		zapcore.DebugLevel,
-	))
+	logFile, err := os.OpenFile("bridge.log", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
+	if err != nil {
+		panic(err)
+	}
+	defer logFile.Close()
+
+	pe := zap.NewProductionEncoderConfig()
+	fileEncoder := zapcore.NewJSONEncoder(pe)
+	consoleEncoder := zapcore.NewConsoleEncoder(pe)
+
+	core := zapcore.NewTee(
+		zapcore.NewCore(fileEncoder, zapcore.AddSync(logFile), zap.InfoLevel),
+		zapcore.NewCore(consoleEncoder, zapcore.AddSync(colorable.NewColorableStdout()), zap.InfoLevel),
+	)
+	logger := zap.New(core).Sugar()
+
+	if cfg.PromPort != "" {
+		StartPromServer(logger, cfg.PromPort)
+	}
+
+	ksApi, err := NewKaspaAPI(cfg.RPCServer, logger)
+	if err != nil {
+		return err
+	}
+
+	shareHandler := newShareHandler(ksApi.kaspad)
+	clientHandler := newClientListener(logger, shareHandler)
+	handlers := gostratum.DefaultHandlers()
+	// override the submit handler with an actual useful handler
+	handlers[string(stratumrpc.StratumMethodSubmit)] =
+		func(ctx *gostratum.StratumContext, event stratumrpc.JsonRpcEvent) error {
+			return shareHandler.HandleSubmit(ctx, event)
+		}
+
+	if cfg.PrintStats {
+		go shareHandler.startStatsThread()
+	}
 
 	stratumConfig := gostratum.StratumListenerConfig{
 		Port:           cfg.StratumPort,
-		HandlerMap:     gostratum.DefaultHandlers(),
-		StateGenerator: gostratum.MiningStateGenerator,
+		HandlerMap:     handlers,
+		StateGenerator: MiningStateGenerator,
+		ClientListener: clientHandler,
 		Logger:         logger,
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ksApi.Start(ctx, func() {
+		clientHandler.NewBlockAvailable(ksApi.kaspad)
+	})
 
 	server := gostratum.NewListener(stratumConfig)
 	server.Listen(context.Background())
 	return nil
-}
-
-func (s *StratumServer) SubmitResult(block *appmessage.RPCBlock, nonce *big.Int) *StratumResult {
-	s.log("submitting block to kaspad")
-	s.log(fmt.Sprintf("Submitting nonce: %d", nonce.Uint64()))
-	converted, err := appmessage.RPCBlockToDomainBlock(block)
-	if err != nil {
-		s.log(fmt.Sprintf("failed to cast block to mutable block: %+v", err))
-	}
-	mutable := converted.Header.ToMutable()
-	mutable.SetNonce(nonce.Uint64())
-	msg, err := s.kaspad.SubmitBlock(&externalapi.DomainBlock{
-		Header:       mutable.ToImmutable(),
-		Transactions: converted.Transactions,
-	})
-	if err != nil {
-		s.log(fmt.Sprintf("failed to submit block: %+v", err))
-	}
-	switch msg {
-	default:
-		s.log("[Server] block accepted!!")
-		s.blocksFound++
-		return &StratumResult{
-			Result: true,
-		}
-	case appmessage.RejectReasonNone:
-		s.blocksFound++
-		s.log("[Server] block accepted!!")
-		return &StratumResult{
-			Result: true,
-		}
-		// :)
-	case appmessage.RejectReasonBlockInvalid:
-		s.rejections++
-		s.log("[Server] block reject, unknown issue (probably bad pow)")
-		// :'(
-		return &StratumResult{
-			Result: []any{20, "Unknown problem", nil},
-		}
-	case appmessage.RejectReasonIsInIBD:
-		s.stales++
-		s.log("[Server] block reject, stale")
-		// stale
-		return &StratumResult{
-			Result: []any{21, "Job not found", nil},
-		}
-	}
-}
-
-func (s *StratumServer) disconnected(mc *MinerConnection) {
-	s.clientLock.Lock()
-	if _, exists := s.clients[mc.remoteAddress]; exists {
-		delete(s.clients, mc.remoteAddress)
-		s.disconnects++
-	}
-	s.clientLock.Unlock()
-}
-
-func (s *StratumServer) startBlockTemplateListener() {
-	blockReadyChan := make(chan bool)
-	err := s.kaspad.RegisterForNewBlockTemplateNotifications(func(_ *appmessage.NewBlockTemplateNotificationMessage) {
-		blockReadyChan <- true
-	})
-	if err != nil {
-		s.log("fatal: failed to register for block notifications from kaspa")
-	}
-
-	blockReady := func() {
-		s.clientLock.Lock()
-		defer s.clientLock.Unlock()
-		for _, v := range s.clients {
-			if v != nil { // this shouldn't happen but apparently it did
-				go v.NewBlockAvailable()
-			}
-		}
-	}
-
-	const tickerTime = 500 * time.Millisecond
-	ticker := time.NewTicker(tickerTime)
-	for {
-		select {
-		case <-blockReadyChan:
-			blockReady()
-			ticker.Reset(tickerTime)
-		case <-ticker.C: // timeout, manually check for new blocks
-			blockReady()
-		}
-	}
-}
-
-func (s *StratumServer) waitForSync() error {
-	for {
-		clientInfo, err := s.kaspad.GetInfo()
-		if err != nil {
-			return errors.Wrapf(err, "error fetching server info from kaspad @ %s", s.cfg.RPCServer)
-		}
-		if clientInfo.IsSynced {
-			break
-		}
-		s.log("Kaspa is not synced, waiting for sync before starting bridge")
-		time.Sleep(5 * time.Second)
-	}
-	return nil
-}
-
-func (s *StratumServer) startStatsThread() error {
-	start := time.Now()
-	for {
-		time.Sleep(10 * time.Second)
-		s.clientLock.RLock()
-		str := "\n========================================================\n"
-		str += fmt.Sprintf("uptime %s | mined %d | stales %d | reject %d | disconn: %d\n",
-			time.Since(start).Round(time.Second), s.blocksFound, s.stales, s.rejections, s.disconnects)
-		str += "--------------------------------------------------------\n"
-		str += "worker\t| avg hashrate\t| shares\t| uptime\n"
-		str += "--------------------------------------------------------\n"
-		var lines []string
-		totalRate := float64(0)
-		for _, v := range s.clients {
-			rate := v.GetAverageHashrateGHz()
-			totalRate += rate
-			lines = append(lines, fmt.Sprintf("%s\t| %0.2fGH/s\t| %d\t| %s",
-				v.tag, v.GetAverageHashrateGHz(), v.sharesFound, time.Since(v.startTime).Round(time.Second)))
-		}
-		sort.Strings(lines)
-		str += strings.Join(lines, "\n")
-		str += "\n--------------------------------------------------------\n"
-		str += fmt.Sprintf("total\t| %0.2fGH/s", totalRate)
-		str += "\n========================================================\n"
-		s.clientLock.RUnlock()
-		log.Println(str)
-	}
 }

@@ -12,11 +12,15 @@ import (
 )
 
 type StratumContext struct {
-	ctx        context.Context
-	RemoteAddr string
-	Logger     *zap.Logger
-	connection net.Conn
-	State      any // gross, but go generics aren't mature enough this can be typed 😭
+	ctx          context.Context
+	RemoteAddr   string
+	WalletAddr   string
+	WorkerName   string
+	RemoteApp    string
+	Logger       *zap.SugaredLogger
+	connection   net.Conn
+	onDisconnect chan *StratumContext
+	State        any // gross, but go generics aren't mature enough this can be typed 😭
 }
 
 func (sc *StratumContext) Reply(response stratumrpc.JsonRpcResponse) error {
@@ -24,7 +28,9 @@ func (sc *StratumContext) Reply(response stratumrpc.JsonRpcResponse) error {
 	if err != nil {
 		return errors.Wrap(err, "failed encoding jsonrpc response")
 	}
+	encoded = append(encoded, '\n')
 	_, err = sc.connection.Write(encoded)
+	sc.checkDisconnect(err)
 	return err
 }
 
@@ -33,8 +39,16 @@ func (sc *StratumContext) Send(event stratumrpc.JsonRpcEvent) error {
 	if err != nil {
 		return errors.Wrap(err, "failed encoding jsonrpc event")
 	}
+	encoded = append(encoded, '\n')
 	_, err = sc.connection.Write(encoded)
+	sc.checkDisconnect(err)
 	return err
+}
+
+func (sc *StratumContext) checkDisconnect(err error) {
+	if err != nil { // actual error
+		sc.onDisconnect <- sc
+	}
 }
 
 // Context interface impl

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
@@ -14,6 +15,12 @@ import (
 type DisconnectChannel chan *StratumContext
 type StateGenerator func() any
 type EventHandler func(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error
+
+type StratumClientListener interface {
+	OnConnect(ctx *StratumContext)
+	OnDisconnect(ctx *StratumContext)
+}
+
 type StratumHandlerMap map[string]EventHandler
 
 type StratumStats struct {
@@ -21,8 +28,9 @@ type StratumStats struct {
 }
 
 type StratumListenerConfig struct {
-	Logger         *zap.Logger
+	Logger         *zap.SugaredLogger
 	HandlerMap     StratumHandlerMap
+	ClientListener StratumClientListener
 	StateGenerator StateGenerator
 	Port           string
 }
@@ -83,17 +91,28 @@ func (s *StratumListener) Listen(ctx context.Context) error {
 
 func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 	addr := connection.RemoteAddr().String()
+	parts := strings.Split(addr, ":")
+	if len(parts) > 0 {
+		addr = parts[0] // trim off the port
+	}
 	clientContext := &StratumContext{
-		ctx:        ctx,
-		RemoteAddr: addr,
-		Logger:     s.Logger.With(zap.String("client", addr)),
-		connection: connection,
-		State:      s.StateGenerator(),
+		ctx:          ctx,
+		RemoteAddr:   addr,
+		Logger:       s.Logger.With(zap.String("client", addr)),
+		connection:   connection,
+		State:        s.StateGenerator(),
+		onDisconnect: s.disconnectChannel,
 	}
 
-	s.Logger.Info("new client connecting", zap.String("client", addr))
+	s.Logger.Info("new client connecting - ", addr)
 	s.clients.Store(addr, &clientContext)
+
+	if s.ClientListener != nil { // TODO: should this be before we spawn the handler?
+		s.ClientListener.OnConnect(clientContext)
+	}
+
 	go spawnClientListener(clientContext, connection, s)
+
 }
 
 func (s *StratumListener) HandleEvent(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
@@ -114,8 +133,12 @@ func (s *StratumListener) disconnectListener(ctx context.Context) {
 		case client := <-s.disconnectChannel:
 			_, exists := s.clients.LoadAndDelete(client)
 			if exists {
-				s.Logger.Info("client disconnecting", zap.Any("client", client))
+				s.Logger.Info("client disconnecting - ", client.RemoteAddr)
 				s.stats.Disconnects++
+
+				if s.ClientListener != nil {
+					s.ClientListener.OnDisconnect(client)
+				}
 			}
 		}
 	}

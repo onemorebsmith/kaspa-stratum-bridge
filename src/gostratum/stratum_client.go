@@ -13,10 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type StratumClient interface {
-	OnAuthorize(ctx StratumContext, params []any)
-}
-
 func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumListener) error {
 	defer func() {
 		connection.Close()
