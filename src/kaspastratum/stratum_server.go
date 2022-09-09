@@ -15,25 +15,36 @@ type BridgeConfig struct {
 	RPCServer   string `yaml:"kaspad_address"`
 	PromPort    string `yaml:"prom_port"`
 	PrintStats  bool   `yaml:"print_stats"`
+	UseLogFile  bool   `yaml:"log_to_file"`
 }
 
-func ListenAndServe(cfg BridgeConfig) error {
-	logFile, err := os.OpenFile("bridge.log", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
-	if err != nil {
-		panic(err)
-	}
-	defer logFile.Close()
-
+func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
 	pe := zap.NewProductionEncoderConfig()
 	pe.EncodeTime = zapcore.RFC3339TimeEncoder
 	fileEncoder := zapcore.NewJSONEncoder(pe)
 	consoleEncoder := zapcore.NewConsoleEncoder(pe)
 
+	if !cfg.UseLogFile {
+		return zap.New(zapcore.NewCore(consoleEncoder,
+			zapcore.AddSync(colorable.NewColorableStdout()), zap.InfoLevel)).Sugar(), func() {}
+	}
+
+	// log file fun
+	logFile, err := os.OpenFile("bridge.log", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
+	if err != nil {
+		panic(err)
+	}
+	defer logFile.Close()
 	core := zapcore.NewTee(
 		zapcore.NewCore(fileEncoder, zapcore.AddSync(logFile), zap.InfoLevel),
 		zapcore.NewCore(consoleEncoder, zapcore.AddSync(colorable.NewColorableStdout()), zap.InfoLevel),
 	)
-	logger := zap.New(core).Sugar()
+	return zap.New(core).Sugar(), func() { logFile.Close() }
+}
+
+func ListenAndServe(cfg BridgeConfig) error {
+	logger, logCleanup := configureZap(cfg)
+	defer logCleanup()
 
 	if cfg.PromPort != "" {
 		StartPromServer(logger, cfg.PromPort)

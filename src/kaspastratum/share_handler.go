@@ -198,7 +198,7 @@ func (sh *shareHandler) startStatsThread() error {
 		str += strings.Join(lines, "\n")
 		str += "\n--------------------------------------------------------\n"
 		str += fmt.Sprintf("total\t| %0.2fGH/s", totalRate)
-		str += "\n========================================================\n"
+		str += "\n======================================== ks_bridge_v.1.1\n"
 		sh.statsLock.Unlock()
 		log.Println(str)
 	}

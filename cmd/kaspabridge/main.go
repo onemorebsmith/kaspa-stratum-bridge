@@ -30,6 +30,7 @@ func main() {
 	flag.BoolVar(&cfg.PrintStats, "stats", cfg.PrintStats, "true to show periodic stats to console, default `true`")
 	flag.StringVar(&cfg.RPCServer, "kaspa", cfg.RPCServer, "address of the kaspad node, default `localhost:16110`")
 	flag.StringVar(&cfg.PromPort, "prom", cfg.PromPort, "address to serve prom stats, default `:2112`")
+	flag.BoolVar(&cfg.UseLogFile, "log", cfg.UseLogFile, "if true will output errors to log file, default `true`")
 
 	flag.Parse()
 
@@ -39,6 +40,7 @@ func main() {
 	log.Printf("\tstratum:     %s", cfg.StratumPort)
 	log.Printf("\tprom:        %s", cfg.PromPort)
 	log.Printf("\tstats:       %t", cfg.PrintStats)
+	log.Printf("\tlog:         %t", cfg.UseLogFile)
 	log.Println("----------------------------------")
 
 	if err := kaspastratum.ListenAndServe(cfg); err != nil {
