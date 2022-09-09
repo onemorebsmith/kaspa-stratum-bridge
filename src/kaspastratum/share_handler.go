@@ -16,7 +16,6 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
-	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"github.com/pkg/errors"
 )
 
@@ -26,6 +25,7 @@ type WorkStats struct {
 	InvalidShares int64
 	WorkerName    string
 	StartTime     time.Time
+	LastShare     time.Time
 }
 
 type shareHandler struct {
@@ -62,6 +62,7 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	}
 	if !found { // legit doesn't exist, create it
 		stats = &WorkStats{}
+		stats.LastShare = time.Now()
 		stats.WorkerName = ctx.RemoteAddr
 		stats.StartTime = time.Now()
 		sh.stats[ctx.RemoteAddr] = stats
@@ -71,7 +72,7 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	return stats
 }
 
-func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event stratumrpc.JsonRpcEvent) error {
+func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
 	if len(event.Params) < 2 {
 		return fmt.Errorf("malformed event, expected at least 2 params")
 	}
@@ -108,10 +109,12 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event stratu
 		return sh.submit(ctx, block, &nonce) // will reply
 	}
 
-	atomic.AddInt64(&sh.getCreateStats(ctx).SharesFound, 1)
+	stats := sh.getCreateStats(ctx)
+	atomic.AddInt64(&stats.SharesFound, 1)
+	stats.LastShare = time.Now()
 	RecordShareFound(ctx.WorkerName)
 
-	return ctx.Reply(stratumrpc.JsonRpcResponse{
+	return ctx.Reply(gostratum.JsonRpcResponse{
 		Id:     event.Id,
 		Result: true,
 	})
@@ -139,10 +142,12 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext, block *appmessage.
 	case appmessage.RejectReasonNone:
 		// :)
 		ctx.Logger.Info("block accepted")
-		atomic.AddInt64(&sh.getCreateStats(ctx).SharesFound, 1)
+		stats := sh.getCreateStats(ctx)
+		stats.LastShare = time.Now()
+		atomic.AddInt64(&stats.SharesFound, 1)
 		atomic.AddInt64(&sh.overall.SharesFound, 1)
 		RecordBlockFound(ctx.WorkerName)
-		return ctx.Reply(stratumrpc.JsonRpcResponse{
+		return ctx.Reply(gostratum.JsonRpcResponse{
 			Result: true,
 		})
 	case appmessage.RejectReasonBlockInvalid:
@@ -151,7 +156,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext, block *appmessage.
 		atomic.AddInt64(&sh.getCreateStats(ctx).InvalidShares, 1)
 		atomic.AddInt64(&sh.overall.InvalidShares, 1)
 		RecordInvalidShare(ctx.WorkerName)
-		return ctx.Reply(stratumrpc.JsonRpcResponse{
+		return ctx.Reply(gostratum.JsonRpcResponse{
 			Result: []any{20, "Unknown problem", nil},
 		})
 	case appmessage.RejectReasonIsInIBD:
@@ -160,7 +165,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext, block *appmessage.
 		atomic.AddInt64(&sh.getCreateStats(ctx).StaleShares, 1)
 		atomic.AddInt64(&sh.overall.StaleShares, 1)
 		RecordStaleShare(ctx.WorkerName)
-		return ctx.Reply(stratumrpc.JsonRpcResponse{
+		return ctx.Reply(gostratum.JsonRpcResponse{
 			Result: []any{21, "Job not found", nil},
 		})
 	}
@@ -181,6 +186,9 @@ func (sh *shareHandler) startStatsThread() error {
 		var lines []string
 		totalRate := float64(0)
 		for _, v := range sh.stats {
+			// if len(v.WorkerName) == 0 || time.Since(v.LastShare) > time.Minute*5 {
+			// 	continue
+			// }
 			rate := GetAverageHashrateGHz(v)
 			totalRate += rate
 			lines = append(lines, fmt.Sprintf("%s\t| %0.2fGH/s\t| %d\t| %s",

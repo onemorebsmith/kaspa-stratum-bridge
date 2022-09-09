@@ -1,4 +1,4 @@
-package stratumrpc
+package gostratum
 
 import "encoding/json"
 
@@ -10,10 +10,9 @@ type JsonRpcEvent struct {
 }
 
 type JsonRpcResponse struct {
-	Id      any    `json:"id"`
-	Version string `json:"jsonrpc"`
-	Result  any    `json:"result"`
-	Error   []any  `json:"error"`
+	Id     any   `json:"id"`
+	Result any   `json:"result"`
+	Error  []any `json:"error"`
 }
 
 func NewEvent(id string, method string, params []any) JsonRpcEvent {
@@ -34,10 +33,9 @@ func NewEvent(id string, method string, params []any) JsonRpcEvent {
 
 func NewResponse(event JsonRpcEvent, results any, err []any) JsonRpcResponse {
 	return JsonRpcResponse{
-		Id:      event.Id,
-		Version: "2.0",
-		Result:  results,
-		Error:   err,
+		Id:     event.Id,
+		Result: results,
+		Error:  err,
 	}
 }
 

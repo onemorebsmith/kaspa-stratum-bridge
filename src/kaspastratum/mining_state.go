@@ -16,6 +16,7 @@ type MiningState struct {
 	jobCounter  int
 	bigDiff     big.Int
 	initialized bool
+	useBigJob   bool
 }
 
 func MiningStateGenerator() any {

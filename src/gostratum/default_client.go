@@ -5,10 +5,17 @@ import (
 	"strings"
 
 	"github.com/mattn/go-colorable"
-	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+)
+
+type StratumMethod string
+
+const (
+	StratumMethodSubscribe StratumMethod = "mining.subscribe"
+	StratumMethodAuthorize StratumMethod = "mining.authorize"
+	StratumMethodSubmit    StratumMethod = "mining.submit"
 )
 
 func DefaultLogger() *zap.SugaredLogger {
@@ -32,13 +39,13 @@ func DefaultConfig(logger *zap.SugaredLogger) StratumListenerConfig {
 
 func DefaultHandlers() StratumHandlerMap {
 	return StratumHandlerMap{
-		string(stratumrpc.StratumMethodSubscribe): HandleSubscribe,
-		string(stratumrpc.StratumMethodAuthorize): HandleAuthorize,
-		string(stratumrpc.StratumMethodSubmit):    HandleSubmit,
+		string(StratumMethodSubscribe): HandleSubscribe,
+		string(StratumMethodAuthorize): HandleAuthorize,
+		string(StratumMethodSubmit):    HandleSubmit,
 	}
 }
 
-func HandleAuthorize(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
+func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	if len(event.Params) < 1 {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address")
 	}
@@ -55,15 +62,15 @@ func HandleAuthorize(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
 	ctx.WalletAddr = address
 	ctx.WorkerName = workerName
 
-	if err := ctx.Reply(stratumrpc.NewResponse(event, true, nil)); err != nil {
+	if err := ctx.Reply(NewResponse(event, true, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to authorize")
 	}
 	ctx.Logger.Info("client authorized, address: ", ctx.WalletAddr)
 	return nil
 }
 
-func HandleSubscribe(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
-	if err := ctx.Reply(stratumrpc.NewResponse(event,
+func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
+	if err := ctx.Reply(NewResponse(event,
 		[]any{true, "EthereumStratum/1.0.0"}, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to subscribe")
 	}
@@ -78,7 +85,7 @@ func HandleSubscribe(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
 	return nil
 }
 
-func HandleSubmit(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
+func HandleSubmit(ctx *StratumContext, event JsonRpcEvent) error {
 	// stub
 	ctx.Logger.Info("work submission")
 	return nil

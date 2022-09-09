@@ -6,14 +6,16 @@ import (
 
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
+	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 type KaspaApi struct {
-	address string
-	logger  *zap.SugaredLogger
-	kaspad  *rpcclient.RPCClient
+	address   string
+	logger    *zap.SugaredLogger
+	kaspad    *rpcclient.RPCClient
+	connected bool
 }
 
 func NewKaspaAPI(address string, logger *zap.SugaredLogger) (*KaspaApi, error) {
@@ -23,21 +25,32 @@ func NewKaspaAPI(address string, logger *zap.SugaredLogger) (*KaspaApi, error) {
 	}
 
 	return &KaspaApi{
-		address: address,
-		logger:  logger.With(zap.String("component", "kaspaapi:"+address)),
-		kaspad:  client,
+		address:   address,
+		logger:    logger.With(zap.String("component", "kaspaapi:"+address)),
+		kaspad:    client,
+		connected: true,
 	}, nil
 }
 
 func (ks *KaspaApi) Start(ctx context.Context, blockCb func()) {
-	ks.waitForSync()
+	ks.waitForSync(true)
 	go ks.startBlockTemplateListener(ctx, blockCb)
-
 }
 
-func (s *KaspaApi) waitForSync() error {
-	for {
+func (ks *KaspaApi) reconnect() error {
+	client, err := rpcclient.NewRPCClient(ks.address)
+	if err != nil {
+		return err
+	}
+	ks.kaspad = client
+	return nil
+}
+
+func (s *KaspaApi) waitForSync(verbose bool) error {
+	if verbose {
 		s.logger.Info("checking kaspad sync state")
+	}
+	for {
 		clientInfo, err := s.kaspad.GetInfo()
 		if err != nil {
 			return errors.Wrapf(err, "error fetching server info from kaspad @ %s", s.address)
@@ -48,7 +61,9 @@ func (s *KaspaApi) waitForSync() error {
 		s.logger.Warn("Kaspa is not synced, waiting for sync before starting bridge")
 		time.Sleep(5 * time.Second)
 	}
-	s.logger.Info("kaspad synced, starting server")
+	if verbose {
+		s.logger.Info("kaspad synced, starting server")
+	}
 	return nil
 }
 
@@ -64,6 +79,13 @@ func (s *KaspaApi) startBlockTemplateListener(ctx context.Context, blockReadyCb 
 	const tickerTime = 500 * time.Millisecond
 	ticker := time.NewTicker(tickerTime)
 	for {
+		if err := s.waitForSync(false); err != nil {
+			s.logger.Error("error checking kaspad sync state, attempting reconnect: ", err)
+			if err := s.reconnect(); err != nil {
+				s.logger.Error("error reconnecting to kaspad, waiting before retry: ", err)
+				time.Sleep(5 * time.Second)
+			}
+		}
 		select {
 		case <-ctx.Done():
 			s.logger.Warn("context cancelled, stopping block update listener")
@@ -75,4 +97,13 @@ func (s *KaspaApi) startBlockTemplateListener(ctx context.Context, blockReadyCb 
 			blockReadyCb()
 		}
 	}
+}
+
+func (ks *KaspaApi) GetBlockTemplate(
+	client *gostratum.StratumContext) (*appmessage.GetBlockTemplateResponseMessage, error) {
+	template, err := ks.kaspad.GetBlockTemplate(client.WalletAddr, `"kaspa-stratum-bridge=["onemorebsmith"]`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed fetching new block template from kaspa")
+	}
+	return template, nil
 }

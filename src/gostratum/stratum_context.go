@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -27,7 +26,7 @@ type StratumContext struct {
 
 var ErrorDisconnected = fmt.Errorf("disconnecting")
 
-func (sc *StratumContext) Reply(response stratumrpc.JsonRpcResponse) error {
+func (sc *StratumContext) Reply(response JsonRpcResponse) error {
 	if sc.disconnecting {
 		return ErrorDisconnected
 	}
@@ -41,7 +40,7 @@ func (sc *StratumContext) Reply(response stratumrpc.JsonRpcResponse) error {
 	return err
 }
 
-func (sc *StratumContext) Send(event stratumrpc.JsonRpcEvent) error {
+func (sc *StratumContext) Send(event JsonRpcEvent) error {
 	if sc.disconnecting {
 		return ErrorDisconnected
 	}

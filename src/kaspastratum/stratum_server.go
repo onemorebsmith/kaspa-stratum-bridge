@@ -6,7 +6,6 @@ import (
 
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
-	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -26,6 +25,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 	defer logFile.Close()
 
 	pe := zap.NewProductionEncoderConfig()
+	pe.EncodeTime = zapcore.RFC3339TimeEncoder
 	fileEncoder := zapcore.NewJSONEncoder(pe)
 	consoleEncoder := zapcore.NewConsoleEncoder(pe)
 
@@ -48,14 +48,10 @@ func ListenAndServe(cfg BridgeConfig) error {
 	clientHandler := newClientListener(logger, shareHandler)
 	handlers := gostratum.DefaultHandlers()
 	// override the submit handler with an actual useful handler
-	handlers[string(stratumrpc.StratumMethodSubmit)] =
-		func(ctx *gostratum.StratumContext, event stratumrpc.JsonRpcEvent) error {
+	handlers[string(gostratum.StratumMethodSubmit)] =
+		func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
 			return shareHandler.HandleSubmit(ctx, event)
 		}
-
-	if cfg.PrintStats {
-		go shareHandler.startStatsThread()
-	}
 
 	stratumConfig := gostratum.StratumListenerConfig{
 		Port:           cfg.StratumPort,
@@ -68,8 +64,12 @@ func ListenAndServe(cfg BridgeConfig) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ksApi.Start(ctx, func() {
-		clientHandler.NewBlockAvailable(ksApi.kaspad)
+		clientHandler.NewBlockAvailable(ksApi)
 	})
+
+	if cfg.PrintStats {
+		go shareHandler.startStatsThread()
+	}
 
 	server := gostratum.NewListener(stratumConfig)
 	server.Listen(context.Background())

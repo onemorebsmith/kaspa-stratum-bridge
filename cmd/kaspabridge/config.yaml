@@ -15,3 +15,8 @@ print_stats: true
 # prom_port: if this is specified prometheus will serve stats on the port provided 
 # Note `:PORT` format is needed if not specifiying a specific ip range 
 prom_port: :2114
+
+# log_level: debug/info/warn/error
+log_level: error
+
+ 

@@ -1,4 +1,4 @@
-package testmocks
+package gostratum
 
 import (
 	"context"

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -21,7 +20,7 @@ func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumLis
 
 	for {
 		err := readFromConnection(connection, func(line string) error {
-			event, err := stratumrpc.UnmarshalEvent(line)
+			event, err := UnmarshalEvent(line)
 			if err != nil {
 				return err
 			}

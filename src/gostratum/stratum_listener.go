@@ -2,19 +2,17 @@ package gostratum
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"strings"
 	"sync"
 
-	"github.com/onemorebsmith/kaspastratum/src/gostratum/stratumrpc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 type DisconnectChannel chan *StratumContext
 type StateGenerator func() any
-type EventHandler func(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error
+type EventHandler func(ctx *StratumContext, event JsonRpcEvent) error
 
 type StratumClientListener interface {
 	OnConnect(ctx *StratumContext)
@@ -116,11 +114,11 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 
 }
 
-func (s *StratumListener) HandleEvent(ctx *StratumContext, event stratumrpc.JsonRpcEvent) error {
+func (s *StratumListener) HandleEvent(ctx *StratumContext, event JsonRpcEvent) error {
 	if handler, exists := s.HandlerMap[string(event.Method)]; exists {
 		return handler(ctx, event)
 	}
-	s.Logger.Warn(fmt.Sprintf("unhandled event '%+v'", event))
+	//s.Logger.Warn(fmt.Sprintf("unhandled event '%+v'", event))
 	return nil
 }
 
