@@ -52,16 +52,11 @@ github.com/kaspanet/go-secp256k1 v0.0.7 h1:WHnrwopKB6ZeHSbdAwwxNhTqflm56XT1mM6LF
 github.com/kaspanet/go-secp256k1 v0.0.7/go.mod h1:cFbxhxKkxqHX5eIwUGKARkph19PehipDPJejWB+H0jM=
 github.com/kaspanet/kaspad v0.12.4 h1:cczqSWYbgrLmhrZDBK2lOaW4olfc/y4B7n6ScBJRCAc=
 github.com/kaspanet/kaspad v0.12.4/go.mod h1:xmf5rXCh1DNxiUPg2BRVmZiarpP3mH4WzVbJ1LprH6I=
-<<<<<<< HEAD
 github.com/kaspanet/kaspad v0.12.6 h1:sA0kW9+k9cdhwf9yw/GZax/l4DEJonorc9LiphdX6mQ=
 github.com/kaspanet/kaspad v0.12.6/go.mod h1:5fH29a2ZIeET3GDkBqAN9Yk7tOl9mYteNkOlw3F9kMA=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
-=======
-github.com/kaspanet/kaspad v0.12.5 h1:9LYbvhF71guz0QH0pkwzlvY2J/fRHslS+FmaYLlHJmU=
-github.com/kaspanet/kaspad v0.12.5/go.mod h1:xmf5rXCh1DNxiUPg2BRVmZiarpP3mH4WzVbJ1LprH6I=
->>>>>>> 9eccc0b67f7eba18a069c9edfab69b9df5bd3cc0
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
