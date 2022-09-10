@@ -4,74 +4,68 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
+var workerLabels = []string{
+	"worker", "miner", "ip",
+}
+
 var shareCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "valid_share_counter",
+	Name: "ks_valid_share_counter",
 	Help: "Number of shares found by worker over time",
-}, []string{
-	"worker",
-})
+}, workerLabels)
+
 var staleCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "stale_share_counter",
+	Name: "ks_stale_share_counter",
 	Help: "Number of stale shares found by worker over time",
-}, []string{
-	"worker",
-})
+}, workerLabels)
 
 var invalidCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "invalid_share_counter",
+	Name: "ks_invalid_share_counter",
 	Help: "Number of stale shares found by worker over time",
-}, []string{
-	"worker",
-})
+}, workerLabels)
 
 var blockCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "blocks_mined",
+	Name: "ks_blocks_mined",
 	Help: "Number of blocks mined over time",
-}, []string{
-	"worker",
-})
+}, workerLabels)
 
 var disconnectCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "worker_disconnect_counter",
+	Name: "ks_worker_disconnect_counter",
 	Help: "Number of disconnects by worker",
-}, []string{
-	"worker",
-})
+}, workerLabels)
 
-func RecordShareFound(worker string) {
-	shareCounter.With(prometheus.Labels{
-		"worker": worker,
-	}).Inc()
+func commonLabels(worker *gostratum.StratumContext) prometheus.Labels {
+	return prometheus.Labels{
+		"worker": worker.WorkerName,
+		"miner":  worker.RemoteApp,
+		"ip":     worker.RemoteAddr,
+	}
 }
 
-func RecordStaleShare(worker string) {
-	staleCounter.With(prometheus.Labels{
-		"worker": worker,
-	}).Inc()
+func RecordShareFound(worker *gostratum.StratumContext) {
+	shareCounter.With(commonLabels(worker)).Inc()
 }
 
-func RecordInvalidShare(worker string) {
-	invalidCounter.With(prometheus.Labels{
-		"worker": worker,
-	}).Inc()
+func RecordStaleShare(worker *gostratum.StratumContext) {
+	staleCounter.With(commonLabels(worker)).Inc()
 }
 
-func RecordBlockFound(worker string) {
-	blockCounter.With(prometheus.Labels{
-		"worker": worker,
-	}).Inc()
+func RecordInvalidShare(worker *gostratum.StratumContext) {
+	invalidCounter.With(commonLabels(worker)).Inc()
 }
 
-func RecordDisconnect(worker string) {
-	disconnectCounter.With(prometheus.Labels{
-		"worker": worker,
-	}).Inc()
+func RecordBlockFound(worker *gostratum.StratumContext) {
+	blockCounter.With(commonLabels(worker)).Inc()
+}
+
+func RecordDisconnect(worker *gostratum.StratumContext) {
+	disconnectCounter.With(commonLabels(worker)).Inc()
 }
 
 var promInit sync.Once

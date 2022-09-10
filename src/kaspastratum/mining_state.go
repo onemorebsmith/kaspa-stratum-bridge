@@ -39,9 +39,9 @@ func (ms *MiningState) AddJob(job *appmessage.RPCBlock) int {
 	return idx
 }
 
-func (ms *MiningState) GetJob(id int) *appmessage.RPCBlock {
+func (ms *MiningState) GetJob(id int) (*appmessage.RPCBlock, bool) {
 	ms.JobLock.Lock()
-	job := ms.Jobs[id]
+	job, exists := ms.Jobs[id]
 	ms.JobLock.Unlock()
-	return job
+	return job, exists
 }

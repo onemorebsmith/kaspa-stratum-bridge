@@ -44,7 +44,7 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	c.clientLock.Lock()
 	delete(c.clients, ctx.RemoteAddr)
 	c.clientLock.Unlock()
-	RecordDisconnect(ctx.WorkerName)
+	RecordDisconnect(ctx)
 }
 
 func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {

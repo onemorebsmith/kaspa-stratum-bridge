@@ -34,7 +34,6 @@ func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
 	if err != nil {
 		panic(err)
 	}
-	defer logFile.Close()
 	core := zapcore.NewTee(
 		zapcore.NewCore(fileEncoder, zapcore.AddSync(logFile), zap.InfoLevel),
 		zapcore.NewCore(consoleEncoder, zapcore.AddSync(colorable.NewColorableStdout()), zap.InfoLevel),

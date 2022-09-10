@@ -85,7 +85,10 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		return errors.Wrap(err, "job id is not parsable as an number")
 	}
 	state := GetMiningState(ctx)
-	block := state.GetJob(int(jobId))
+	block, exists := state.GetJob(int(jobId))
+	if !exists {
+		return fmt.Errorf("job does not exist. stale?")
+	}
 	noncestr, ok := event.Params[2].(string)
 	if !ok {
 		return fmt.Errorf("unexpected type for param 2: %+v", event.Params...)
@@ -112,7 +115,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	stats := sh.getCreateStats(ctx)
 	atomic.AddInt64(&stats.SharesFound, 1)
 	stats.LastShare = time.Now()
-	RecordShareFound(ctx.WorkerName)
+	RecordShareFound(ctx)
 
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Id:     event.Id,
@@ -146,7 +149,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext, block *appmessage.
 		stats.LastShare = time.Now()
 		atomic.AddInt64(&stats.SharesFound, 1)
 		atomic.AddInt64(&sh.overall.SharesFound, 1)
-		RecordBlockFound(ctx.WorkerName)
+		RecordBlockFound(ctx)
 		return ctx.Reply(gostratum.JsonRpcResponse{
 			Result: true,
 		})
@@ -155,7 +158,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext, block *appmessage.
 		// :'(
 		atomic.AddInt64(&sh.getCreateStats(ctx).InvalidShares, 1)
 		atomic.AddInt64(&sh.overall.InvalidShares, 1)
-		RecordInvalidShare(ctx.WorkerName)
+		RecordInvalidShare(ctx)
 		return ctx.Reply(gostratum.JsonRpcResponse{
 			Result: []any{20, "Unknown problem", nil},
 		})
@@ -164,7 +167,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext, block *appmessage.
 		// stale
 		atomic.AddInt64(&sh.getCreateStats(ctx).StaleShares, 1)
 		atomic.AddInt64(&sh.overall.StaleShares, 1)
-		RecordStaleShare(ctx.WorkerName)
+		RecordStaleShare(ctx)
 		return ctx.Reply(gostratum.JsonRpcResponse{
 			Result: []any{21, "Job not found", nil},
 		})
