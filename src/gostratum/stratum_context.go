@@ -26,6 +26,10 @@ type StratumContext struct {
 
 var ErrorDisconnected = fmt.Errorf("disconnecting")
 
+func (sc *StratumContext) Connected() bool {
+	return !sc.disconnecting
+}
+
 func (sc *StratumContext) Reply(response JsonRpcResponse) error {
 	if sc.disconnecting {
 		return ErrorDisconnected

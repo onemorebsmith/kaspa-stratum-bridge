@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -40,6 +41,31 @@ var disconnectCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Number of disconnects by worker",
 }, workerLabels)
 
+var jobCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "ks_worker_job_counter",
+	Help: "Number of jobs sent to the miner by worker over time",
+}, workerLabels)
+
+var balanceGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "ks_balance_by_wallet_gauge",
+	Help: "Gauge representing the wallet balance for connected workers",
+}, []string{"wallet"})
+
+var estimatedNetworkHashrate = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "ks_estimated_network_hashrate_gauge",
+	Help: "Gauge representing the estimated network hashrate",
+})
+
+var networkDifficulty = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "ks_network_difficulty_gauge",
+	Help: "Gauge representing the network difficulty",
+})
+
+var networkBlockCount = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "ks_network_block_count",
+	Help: "Gauge representing the network block count",
+})
+
 func commonLabels(worker *gostratum.StratumContext) prometheus.Labels {
 	return prometheus.Labels{
 		"worker": worker.WorkerName,
@@ -66,6 +92,29 @@ func RecordBlockFound(worker *gostratum.StratumContext) {
 
 func RecordDisconnect(worker *gostratum.StratumContext) {
 	disconnectCounter.With(commonLabels(worker)).Inc()
+}
+
+func RecordNewJob(worker *gostratum.StratumContext) {
+	jobCounter.With(commonLabels(worker)).Inc()
+}
+
+func RecordNetworkStats(hashrate uint64, blockCount uint64, difficulty float64) {
+	estimatedNetworkHashrate.Set(float64(hashrate))
+	networkDifficulty.Set(difficulty)
+	networkBlockCount.Set(float64(blockCount))
+}
+
+func RecordBalances(response *appmessage.GetBalancesByAddressesResponseMessage) {
+	unique := map[string]struct{}{}
+	for _, v := range response.Entries {
+		// only set once per run
+		if _, exists := unique[v.Address]; !exists {
+			balanceGauge.With(prometheus.Labels{
+				"wallet": v.Address,
+			}).Set(float64(v.Balance) / 100000000)
+			unique[v.Address] = struct{}{}
+		}
+	}
 }
 
 var promInit sync.Once

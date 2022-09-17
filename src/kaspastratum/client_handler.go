@@ -41,6 +41,7 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 }
 
 func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
+	ctx.Done()
 	c.clientLock.Lock()
 	delete(c.clients, ctx.RemoteAddr)
 	c.clientLock.Unlock()
@@ -48,7 +49,13 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 }
 
 func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
+	c.clientLock.Lock()
+	addresses := make([]string, 0, len(c.clients))
+	var blockhash string
 	for _, c := range c.clients {
+		if !c.Connected() {
+			continue
+		}
 		go func(client *gostratum.StratumContext) {
 			state := GetMiningState(client)
 			if client.WalletAddr == "" {
@@ -59,6 +66,9 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			if err != nil {
 				client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
 				return
+			}
+			if blockhash == "" {
+				blockhash = template.Block.Header.Parents[0].ParentHashes[0]
 			}
 			state.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
 			header, err := SerializeBlockHeader(template.Block)
@@ -77,7 +87,7 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 					Method:  "mining.set_difficulty",
 					Params:  []any{fixedDifficulty},
 				}); err != nil {
-					client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error())
+					client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
 				}
 			}
 
@@ -99,8 +109,25 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 				if errors.Is(err, gostratum.ErrorDisconnected) {
 					return
 				}
-				client.Logger.Error(errors.Wrap(err, "failed sending work packet").Error())
+				client.Logger.Error(errors.Wrap(err, "failed sending work packet").Error(),
+					zap.Any("context", client))
 			}
+
+			RecordNewJob(client)
 		}(c)
+		addresses = append(addresses, c.WalletAddr)
 	}
+	c.clientLock.Unlock()
+
+	if len(addresses) > 0 {
+		go func() {
+			balances, err := kapi.kaspad.GetBalancesByAddresses(addresses)
+			if err != nil {
+				c.logger.Warn("failed to get balances from kaspa, prom stats will be out of date", zap.Error(err))
+				return
+			}
+			RecordBalances(balances)
+		}()
+	}
+
 }

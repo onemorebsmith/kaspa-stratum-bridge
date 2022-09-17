@@ -27,3 +27,4 @@ __debug_bin
 
 cmd/kaspabridge/kaspabridge
 cmd/kaspabridge/bridge.log
+release/
