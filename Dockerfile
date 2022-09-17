@@ -1,6 +1,9 @@
 FROM golang:1.18 as builder
 
-
+LABEL org.opencontainers.image.description="Dockerized Kaspa Stratum Bridge"      
+LABEL org.opencontainers.image.authors="onemorebsmith"  
+LABEL org.opencontainers.image.source="https://github.com/onemorebsmith/kaspa-stratum-bridge"
+              
 WORKDIR /go/src/app
 ADD go.mod .
 ADD go.sum .
