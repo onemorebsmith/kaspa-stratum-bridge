@@ -1,7 +1,7 @@
 volumes:
   prometheus_data: {}
 services:
-  bridge:
+  ks_bridge:
     image: onemorebsmith/kaspa_bridge:1.1
     container_name: ks_bridge
     restart: unless-stopped
