@@ -1,4 +1,4 @@
-FROM golang:1.18 as builder
+FROM golang:1.19.1 as builder
 
 LABEL org.opencontainers.image.description="Dockerized Kaspa Stratum Bridge"      
 LABEL org.opencontainers.image.authors="onemorebsmith"  
