@@ -17,6 +17,9 @@ Tested on windows, x64 macos & ubuntu w/ lolminer, SRBMiner, & bzminer for both 
 No fee, forever. Do what you want with it.
 
 Huge shoutout to https://github.com/KaffinPX/KStratum for the inspiration
+  
+
+Tips appreciated: `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp`
 
   
 
@@ -83,9 +86,3 @@ all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 ## Metrics
 
 If the app is run with the `-prom={port}` flag the application will host stats on the port specified by `{port}`, these stats are documented in the file [prom.go](src/kaspastratum/prom.go). This is intended to be use by prometheus but the stats can be fetched and used independently if desired. `curl http://localhost:2114/metrics | grep ks_` will get a listing of current stats. All published stats have a `ks_` prefix for ease of use.
-
-  
-
-  
-
-Tips appreciated: `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp`
