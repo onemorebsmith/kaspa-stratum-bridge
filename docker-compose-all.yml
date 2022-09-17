@@ -2,19 +2,21 @@ volumes:
   prometheus_data: {}
 services:
   bridge:
-    image: onemorebsmith/kaspa_bridge:latest
+    image: onemorebsmith/kaspa_bridge:1.1
     container_name: ks_bridge
     restart: unless-stopped
     user: "0"
     command:
-      - '-log=false'
+      - '-log=true'
       - '-stats=false'
-      - '-stratum=":5555"'
-      - '-prom=":2112"'
-      - '-kaspa="localhost:16110"'
+      - '-stratum=:5555'
+      - '-prom=:2114'
+      - '-kaspa=host.docker.internal:16110'
     ports:
       - 5555:5555
-      - 2112:2112
+      - 2114:2114
+    extra_hosts:
+      - host.docker.internal:host-gateway
   grafana:
     image: grafana/grafana-oss:latest
     container_name: ks_grafana
@@ -34,12 +36,7 @@ services:
     restart: unless-stopped
     volumes:
       - prometheus_data:/prometheus
-      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--docker.file=/etc/prometheus/prometheus.yml'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
+      - ./docker/prometheus-internal.yml:/etc/prometheus/prometheus.yml
     ports:
       - 9090:9090
     extra_hosts:
