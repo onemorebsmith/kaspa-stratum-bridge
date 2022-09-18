@@ -3,7 +3,6 @@ package kaspastratum
 import (
 	"fmt"
 	"log"
-	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -93,23 +92,37 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	if !ok {
 		return fmt.Errorf("unexpected type for param 2: %+v", event.Params...)
 	}
+	ctx.Logger.Info("submit " + noncestr)
 	noncestr = strings.Replace(noncestr, "0x", "", 1)
-	nonce := big.Int{}
-	nonce.SetString(noncestr, 16)
+	var nonce uint64
+	if GetMiningState(ctx).useBigJob {
+		nonce, err = strconv.ParseUint(noncestr, 16, 64)
+		if err != nil {
+			return errors.Wrap(err, "failed parsing noncestr")
+		}
+	} else {
+		nonce, err = strconv.ParseUint(noncestr, 16, 64)
+		if err != nil {
+			return errors.Wrap(err, "failed parsing noncestr")
+		}
+	}
 
 	converted, err := appmessage.RPCBlockToDomainBlock(block)
 	if err != nil {
 		return fmt.Errorf("failed to cast block to mutable block: %+v", err)
 	}
 	mutableHeader := converted.Header.ToMutable()
-	mutableHeader.SetNonce(nonce.Uint64())
+	mutableHeader.SetNonce(nonce)
 	powState := pow.NewState(mutableHeader)
 	powValue := powState.CalculateProofOfWorkValue()
+
+	ctx.Logger.Info(fmt.Sprintf("found share\ndiff\t%s\ntarget\t%s",
+		powValue.String(), powState.Target.String()))
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
 		ctx.Logger.Info("found block")
-		return sh.submit(ctx, block, &nonce) // will reply
+		return sh.submit(ctx, converted, nonce) // will reply
 	}
 
 	stats := sh.getCreateStats(ctx)
@@ -123,55 +136,49 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	})
 }
 
-func (sh *shareHandler) submit(ctx *gostratum.StratumContext, block *appmessage.RPCBlock, nonce *big.Int) error {
+func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
+	block *externalapi.DomainBlock, nonce uint64) error {
 	ctx.Logger.Info("submitting block to kaspad")
-	ctx.Logger.Info(fmt.Sprintf("Submitting nonce: %d", nonce.Uint64()))
-	converted, err := appmessage.RPCBlockToDomainBlock(block)
-	if err != nil {
-		return fmt.Errorf("failed to cast block to mutable block: %+v", err)
-	}
-	mutable := converted.Header.ToMutable()
-	mutable.SetNonce(nonce.Uint64())
-	msg, err := sh.kaspa.SubmitBlock(&externalapi.DomainBlock{
+	ctx.Logger.Info(fmt.Sprintf("Submitting nonce: %d", nonce))
+	mutable := block.Header.ToMutable()
+	mutable.SetNonce(nonce)
+	_, err := sh.kaspa.SubmitBlock(&externalapi.DomainBlock{
 		Header:       mutable.ToImmutable(),
-		Transactions: converted.Transactions,
+		Transactions: block.Transactions,
 	})
+
 	if err != nil {
-		return errors.Wrap(err, "failed to submit block")
-	}
-	switch msg {
-	default:
-		fallthrough
-	case appmessage.RejectReasonNone:
-		// :)
-		ctx.Logger.Info("block accepted")
-		stats := sh.getCreateStats(ctx)
-		stats.LastShare = time.Now()
-		atomic.AddInt64(&stats.SharesFound, 1)
-		atomic.AddInt64(&sh.overall.SharesFound, 1)
-		RecordBlockFound(ctx)
-		return ctx.Reply(gostratum.JsonRpcResponse{
-			Result: true,
-		})
-	case appmessage.RejectReasonBlockInvalid:
-		ctx.Logger.Warn("block rejected, unknown issue (probably bad pow")
 		// :'(
-		atomic.AddInt64(&sh.getCreateStats(ctx).InvalidShares, 1)
-		atomic.AddInt64(&sh.overall.InvalidShares, 1)
-		RecordInvalidShare(ctx)
-		return ctx.Reply(gostratum.JsonRpcResponse{
-			Result: []any{20, "Unknown problem", nil},
-		})
-	case appmessage.RejectReasonIsInIBD:
-		ctx.Logger.Warn("block rejected, stale")
-		// stale
-		atomic.AddInt64(&sh.getCreateStats(ctx).StaleShares, 1)
-		atomic.AddInt64(&sh.overall.StaleShares, 1)
-		RecordStaleShare(ctx)
-		return ctx.Reply(gostratum.JsonRpcResponse{
-			Result: []any{21, "Job not found", nil},
-		})
+		if strings.Contains(err.Error(), "ErrDuplicateBlock") {
+			ctx.Logger.Warn("block rejected, stale")
+			// stale
+			atomic.AddInt64(&sh.getCreateStats(ctx).StaleShares, 1)
+			atomic.AddInt64(&sh.overall.StaleShares, 1)
+			RecordStaleShare(ctx)
+			return ctx.Reply(gostratum.JsonRpcResponse{
+				Result: []any{21, "Job not found", nil},
+			})
+		} else {
+			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow")
+			atomic.AddInt64(&sh.getCreateStats(ctx).InvalidShares, 1)
+			atomic.AddInt64(&sh.overall.InvalidShares, 1)
+			RecordInvalidShare(ctx)
+			return ctx.Reply(gostratum.JsonRpcResponse{
+				Result: []any{20, "Unknown problem", nil},
+			})
+		}
 	}
+
+	// :)
+	ctx.Logger.Info("block accepted")
+	stats := sh.getCreateStats(ctx)
+	stats.LastShare = time.Now()
+	atomic.AddInt64(&stats.SharesFound, 1)
+	atomic.AddInt64(&sh.overall.SharesFound, 1)
+	RecordBlockFound(ctx)
+	return ctx.Reply(gostratum.JsonRpcResponse{
+		Result: true,
+	})
 }
 
 func (sh *shareHandler) startStatsThread() error {

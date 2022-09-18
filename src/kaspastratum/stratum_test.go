@@ -1,11 +1,13 @@
 package kaspastratum
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,3 +95,24 @@ func TestBridge(t *testing.T) {
 		c.Write(buff)
 	}
 }
+
+func TestBznonce(t *testing.T) {
+	//noncestr := "0000000131468d2b" // orig
+	noncestr := "0938a48b696f5186"
+
+	//binary.LittleEndian.Uint64([]byte(noncestr)) // 3138241691631222784
+	binary.LittleEndian.Uint64([]byte(noncestr)) // 3138241691631222784
+	nonce := big.Int{}
+	//noncestr = fmt.Sprintf("%x", noncestr)
+	log.Printf("%x", binary.LittleEndian.Uint64([]byte(noncestr)))
+	nonce.SetString(noncestr, 16)
+
+	lolstr := "0x0085bad1a2de2d41"
+	lolstr = strings.Replace(lolstr, "0x", "", 1)
+	lolnonce := big.Int{}
+	lolnonce.SetString(lolstr, 16)
+
+	log.Printf("lol:\t%s", lolnonce.String())
+	log.Printf("bz: \t%s", nonce.String())
+}
+6238346138333930
