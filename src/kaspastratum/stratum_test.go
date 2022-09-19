@@ -1,13 +1,11 @@
 package kaspastratum
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"math/big"
 	"net"
-	"strings"
 	"testing"
 	"time"
 
@@ -46,7 +44,7 @@ func TestHeaderSerialization(t *testing.T) {
 
 	{ // job as single string (bzminer)
 		job := GenerateLargeJobParams(header, 1662696346)
-		expected := "266fe80cb20b3a8524abe3990026da66e330963ac8f74dbbd22e14419af219f59abb1a6300000000"
+		expected := "853a0bb20ce86f2666da260099e3ab24bb4df7c83a9630e3f519f29a41142ed29abb1a6300000000"
 		if d := cmp.Diff(expected, job); d != "" {
 			t.Fatalf("jobs generated incorrectly: %s", d)
 		}
@@ -95,24 +93,3 @@ func TestBridge(t *testing.T) {
 		c.Write(buff)
 	}
 }
-
-func TestBznonce(t *testing.T) {
-	//noncestr := "0000000131468d2b" // orig
-	noncestr := "0938a48b696f5186"
-
-	//binary.LittleEndian.Uint64([]byte(noncestr)) // 3138241691631222784
-	binary.LittleEndian.Uint64([]byte(noncestr)) // 3138241691631222784
-	nonce := big.Int{}
-	//noncestr = fmt.Sprintf("%x", noncestr)
-	log.Printf("%x", binary.LittleEndian.Uint64([]byte(noncestr)))
-	nonce.SetString(noncestr, 16)
-
-	lolstr := "0x0085bad1a2de2d41"
-	lolstr = strings.Replace(lolstr, "0x", "", 1)
-	lolnonce := big.Int{}
-	lolnonce.SetString(lolstr, 16)
-
-	log.Printf("lol:\t%s", lolnonce.String())
-	log.Printf("bz: \t%s", nonce.String())
-}
-6238346138333930
