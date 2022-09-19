@@ -44,7 +44,7 @@ func TestHeaderSerialization(t *testing.T) {
 
 	{ // job as single string (bzminer)
 		job := GenerateLargeJobParams(header, 1662696346)
-		expected := "266fe80cb20b3a8524abe3990026da66e330963ac8f74dbbd22e14419af219f59abb1a6300000000"
+		expected := "853a0bb20ce86f2666da260099e3ab24bb4df7c83a9630e3f519f29a41142ed29abb1a6300000000"
 		if d := cmp.Diff(expected, job); d != "" {
 			t.Fatalf("jobs generated incorrectly: %s", d)
 		}
