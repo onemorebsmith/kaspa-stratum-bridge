@@ -61,7 +61,6 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			if client.WalletAddr == "" {
 				return // not ready
 			}
-			client.WalletAddr = "kaspatest:qrejztvuqnedf756zfmgz2wy6z4v5u4q3dqjpa6269gjlmqpkfkd7sgc8tn6p"
 
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {

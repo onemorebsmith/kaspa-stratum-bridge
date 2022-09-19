@@ -6,7 +6,7 @@ stratum_port: :5555
 # For a list of public nodes, run `nslookup mainnet-dnsseed.daglabs-dev.com` 
 # uncomment for to use a public node
 # kaspad_address: 46.17.104.200:16110
-kaspad_address: 144.76.19.91:30120
+kaspad_address: localhost:16110
 
 # print_stats: if true will print stats to the console, false just workers
 # joining/disconnecting, blocks found, and errors will be printed

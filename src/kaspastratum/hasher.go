@@ -101,10 +101,10 @@ func GenerateLargeJobParams(headerData []byte, timestamp uint64) string {
 	ids := []uint64{}
 	timestampBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(timestampBytes, timestamp)
-	ids = append(ids, uint64(binary.LittleEndian.Uint64(headerData[0:])))
-	ids = append(ids, uint64(binary.LittleEndian.Uint64(headerData[8:])))
-	ids = append(ids, uint64(binary.LittleEndian.Uint64(headerData[16:])))
-	ids = append(ids, uint64(binary.LittleEndian.Uint64(headerData[24:])))
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[0:])))
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[8:])))
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[16:])))
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[24:])))
 	ids = append(ids, uint64(binary.LittleEndian.Uint64(timestampBytes)))
 
 	str := fmt.Sprintf("%016x%016x%016x%016x%016x", ids[0], ids[1], ids[2], ids[3], ids[4])
