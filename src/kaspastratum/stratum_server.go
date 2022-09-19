@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const version = "v1.1"
+
 type BridgeConfig struct {
 	StratumPort string `yaml:"stratum_port"`
 	RPCServer   string `yaml:"kaspad_address"`
