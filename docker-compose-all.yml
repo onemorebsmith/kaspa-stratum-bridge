@@ -24,8 +24,8 @@ services:
     user: "0"
     volumes:
       - ./docker/grafana:/var/lib/grafana
-    env_file:
-      - ./docker/grafana.env
+#    env_file:
+#      - ./docker/grafana.env
     ports:
       - 3000:3000
     extra_hosts:

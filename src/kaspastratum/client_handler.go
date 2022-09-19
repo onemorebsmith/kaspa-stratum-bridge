@@ -51,7 +51,6 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
-	var blockhash string
 	for _, c := range c.clients {
 		if !c.Connected() {
 			continue
@@ -59,25 +58,25 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 		go func(client *gostratum.StratumContext) {
 			state := GetMiningState(client)
 			if client.WalletAddr == "" {
+				RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
 				return // not ready
 			}
 
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
+				RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
 				client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
 				return
-			}
-			if blockhash == "" {
-				blockhash = template.Block.Header.Parents[0].ParentHashes[0]
 			}
 			state.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
 			header, err := SerializeBlockHeader(template.Block)
 			if err != nil {
+				RecordWorkerError(client.WalletAddr, ErrBadDataFromMiner)
 				client.Logger.Error(fmt.Sprintf("failed to serialize block header: %s", err))
 				return
 			}
-			jobId := state.AddJob(template.Block)
 
+			jobId := state.AddJob(template.Block)
 			if !state.initialized {
 				state.initialized = true
 				state.useBigJob = bigJobRegex.MatchString(client.RemoteApp)
@@ -87,7 +86,9 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 					Method:  "mining.set_difficulty",
 					Params:  []any{fixedDifficulty},
 				}); err != nil {
+					RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
 					client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
+					return
 				}
 			}
 
@@ -107,8 +108,10 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 				Params:  jobParams,
 			}); err != nil {
 				if errors.Is(err, gostratum.ErrorDisconnected) {
+					RecordWorkerError(client.WalletAddr, ErrDisconnected)
 					return
 				}
+				RecordWorkerError(client.WalletAddr, ErrFailedSendWork)
 				client.Logger.Error(errors.Wrap(err, "failed sending work packet").Error(),
 					zap.Any("context", client))
 			}
@@ -129,5 +132,4 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			RecordBalances(balances)
 		}()
 	}
-
 }

@@ -73,23 +73,28 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 
 func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
 	if len(event.Params) < 2 {
+		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return fmt.Errorf("malformed event, expected at least 2 params")
 	}
 	jobIdStr, ok := event.Params[1].(string)
 	if !ok {
+		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return fmt.Errorf("unexpected type for param 1: %+v", event.Params...)
 	}
 	jobId, err := strconv.ParseInt(jobIdStr, 10, 0)
 	if err != nil {
+		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return errors.Wrap(err, "job id is not parsable as an number")
 	}
 	state := GetMiningState(ctx)
 	block, exists := state.GetJob(int(jobId))
 	if !exists {
+		RecordWorkerError(ctx.WalletAddr, ErrMissingJob)
 		return fmt.Errorf("job does not exist. stale?")
 	}
 	noncestr, ok := event.Params[2].(string)
 	if !ok {
+		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return fmt.Errorf("unexpected type for param 2: %+v", event.Params...)
 	}
 	ctx.Logger.Info("submit " + noncestr)
@@ -98,11 +103,13 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	if GetMiningState(ctx).useBigJob {
 		nonce, err = strconv.ParseUint(noncestr, 16, 64)
 		if err != nil {
+			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	} else {
 		nonce, err = strconv.ParseUint(noncestr, 16, 64)
 		if err != nil {
+			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	}
@@ -115,9 +122,6 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	mutableHeader.SetNonce(nonce)
 	powState := pow.NewState(mutableHeader)
 	powValue := powState.CalculateProofOfWorkValue()
-
-	ctx.Logger.Info(fmt.Sprintf("found share\ndiff\t%s\ntarget\t%s",
-		powValue.String(), powState.Target.String()))
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {

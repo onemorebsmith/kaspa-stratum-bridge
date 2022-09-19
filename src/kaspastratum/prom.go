@@ -13,7 +13,7 @@ import (
 )
 
 var workerLabels = []string{
-	"worker", "miner", "ip",
+	"worker", "miner", "wallet", "ip",
 }
 
 var shareCounter = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -51,6 +51,11 @@ var balanceGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Help: "Gauge representing the wallet balance for connected workers",
 }, []string{"wallet"})
 
+var errorByWallet = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "ks_worker_errors",
+	Help: "Gauge representing errors by worker",
+}, []string{"wallet", "error"})
+
 var estimatedNetworkHashrate = promauto.NewGauge(prometheus.GaugeOpts{
 	Name: "ks_estimated_network_hashrate_gauge",
 	Help: "Gauge representing the estimated network hashrate",
@@ -70,6 +75,7 @@ func commonLabels(worker *gostratum.StratumContext) prometheus.Labels {
 	return prometheus.Labels{
 		"worker": worker.WorkerName,
 		"miner":  worker.RemoteApp,
+		"wallet": worker.WalletAddr,
 		"ip":     worker.RemoteAddr,
 	}
 }
@@ -102,6 +108,13 @@ func RecordNetworkStats(hashrate uint64, blockCount uint64, difficulty float64) 
 	estimatedNetworkHashrate.Set(float64(hashrate))
 	networkDifficulty.Set(difficulty)
 	networkBlockCount.Set(float64(blockCount))
+}
+
+func RecordWorkerError(address string, shortError ErrorShortCodeT) {
+	errorByWallet.With(prometheus.Labels{
+		"wallet": address,
+		"error":  string(shortError),
+	}).Inc()
 }
 
 func RecordBalances(response *appmessage.GetBalancesByAddressesResponseMessage) {
