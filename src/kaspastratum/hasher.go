@@ -20,7 +20,8 @@ const shareValue = float64(2<<(diffPower-1)) / float64(1000000000) // in GH/s
 
 // 🤮 -- difficulty is a decreasing value, so the actual diff val is based on the inverse
 // of the power that we actually want. See the notes in kaspad, they're more coherent
-var fixedDifficulty = BigDiffToLittle(new(big.Int).Lsh(big.NewInt(1), 256-diffPower))
+var fixedDifficultyBI = new(big.Int).Lsh(big.NewInt(1), 256-diffPower)
+var fixedDifficulty = BigDiffToLittle(fixedDifficultyBI)
 
 func SerializeBlockHeader(template *appmessage.RPCBlock) ([]byte, error) {
 	hasher, err := blake2b.New(32, []byte("BlockHash"))

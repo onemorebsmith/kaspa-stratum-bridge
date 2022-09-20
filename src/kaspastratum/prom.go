@@ -21,15 +21,10 @@ var shareCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Number of shares found by worker over time",
 }, workerLabels)
 
-var staleCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "ks_stale_share_counter",
-	Help: "Number of stale shares found by worker over time",
-}, workerLabels)
-
 var invalidCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "ks_invalid_share_counter",
 	Help: "Number of stale shares found by worker over time",
-}, workerLabels)
+}, append(workerLabels, "type"))
 
 var blockCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "ks_blocks_mined",
@@ -85,11 +80,27 @@ func RecordShareFound(worker *gostratum.StratumContext) {
 }
 
 func RecordStaleShare(worker *gostratum.StratumContext) {
-	staleCounter.With(commonLabels(worker)).Inc()
+	labels := commonLabels(worker)
+	labels["type"] = "stale"
+	invalidCounter.With(labels).Inc()
+}
+
+func RecordDupeShare(worker *gostratum.StratumContext) {
+	labels := commonLabels(worker)
+	labels["type"] = "duplicate"
+	invalidCounter.With(labels).Inc()
 }
 
 func RecordInvalidShare(worker *gostratum.StratumContext) {
-	invalidCounter.With(commonLabels(worker)).Inc()
+	labels := commonLabels(worker)
+	labels["type"] = "invalid"
+	invalidCounter.With(labels).Inc()
+}
+
+func RecordWeakShare(worker *gostratum.StratumContext) {
+	labels := commonLabels(worker)
+	labels["type"] = "weak"
+	invalidCounter.With(labels).Inc()
 }
 
 func RecordBlockFound(worker *gostratum.StratumContext) {

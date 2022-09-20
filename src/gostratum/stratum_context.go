@@ -58,6 +58,37 @@ func (sc *StratumContext) Send(event JsonRpcEvent) error {
 	return err
 }
 
+func (sc *StratumContext) ReplyStaleShare(id any) error {
+	return sc.Reply(JsonRpcResponse{
+		Id:     id,
+		Result: nil,
+		Error:  []any{21, "Job not found", nil},
+	})
+}
+func (sc *StratumContext) ReplyDupeShare(id any) error {
+	return sc.Reply(JsonRpcResponse{
+		Id:     id,
+		Result: nil,
+		Error:  []any{22, "Duplicate share submitted", nil},
+	})
+}
+
+func (sc *StratumContext) ReplyBadShare(id any) error {
+	return sc.Reply(JsonRpcResponse{
+		Id:     id,
+		Result: nil,
+		Error:  []any{20, "Unknown problem", nil},
+	})
+}
+
+func (sc *StratumContext) ReplyLowDiffShare(id any) error {
+	return sc.Reply(JsonRpcResponse{
+		Id:     id,
+		Result: nil,
+		Error:  []any{23, "Invalid difficulty", nil},
+	})
+}
+
 func (sc *StratumContext) checkDisconnect(err error) {
 	if err != nil { // actual error
 		sc.disconnecting = true
