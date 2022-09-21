@@ -1,4 +1,6 @@
 # Kaspa Stratum/GRPC bridge
+## This release does not support bzminer, v1.1 will address this issue
+
 This is an daemon that allows mining to a local (or remote) kaspa node using stratum-base miners. 
 
 
