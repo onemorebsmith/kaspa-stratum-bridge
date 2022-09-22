@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/google/go-cmp v0.5.6
-	github.com/kaspanet/kaspad v0.12.6
+	github.com/kaspanet/kaspad v0.12.7
 	github.com/pkg/errors v0.9.1
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
 	gopkg.in/yaml.v2 v2.4.0

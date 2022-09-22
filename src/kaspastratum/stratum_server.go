@@ -192,14 +192,14 @@ func (s *StratumServer) startStatsThread() error {
 		str += fmt.Sprintf("uptime %s | mined %d | stales %d | reject %d | disconn: %d\n",
 			time.Since(start).Round(time.Second), s.blocksFound, s.stales, s.rejections, s.disconnects)
 		str += "--------------------------------------------------------\n"
-		str += "worker\t| avg hashrate\t| shares\t| uptime\n"
+		str += "worker name\t| avg hashrate\t| shares\t| uptime\n"
 		str += "--------------------------------------------------------\n"
 		var lines []string
 		totalRate := float64(0)
 		for _, v := range s.clients {
 			rate := v.GetAverageHashrateGHz()
 			totalRate += rate
-			lines = append(lines, fmt.Sprintf("%s\t| %0.2fGH/s\t| %d\t| %s",
+			lines = append(lines, fmt.Sprintf("%-16s| %0.2fGH/s\t| %d\t\t| %s",
 				v.tag, v.GetAverageHashrateGHz(), v.sharesFound, time.Since(v.startTime).Round(time.Second)))
 		}
 		sort.Strings(lines)
