@@ -31,6 +31,6 @@ You should be good to create the flight sheet now. However, you should verify th
 
 This is what the configuration generally should look like
 
-![image](https://user-images.githubusercontent.com/59971111/191894688-42d8beab-618e-4ce3-ab95-bc57db6a7f73.png)
+![image](https://user-images.githubusercontent.com/59971111/191895060-79033098-4303-496d-b5dd-d4cabcc88946.png)
 
-The important parts are the 'Install URL' (make sure that points back to this repo somewhere)
+The important parts are the 'Install URL' (make sure that points back to this repo somewhere) and double check that your wallet address is set correctly. 
