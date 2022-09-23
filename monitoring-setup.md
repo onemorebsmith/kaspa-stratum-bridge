@@ -2,7 +2,10 @@
 
 ## Reqirements
 
-Docker must be installed: https://www.docker.com/ and follow the setup instructions on the docker website
+Docker must be installed! Visit https://www.docker.com/ and follow the setup instructions on the docker website
+
+
+## Configuration
 
 To begin you need to pull down the repo (or use the zipped source from the release). I'll use the release code for this example. 
 
@@ -48,6 +51,6 @@ This will drop you to the mining dashboard. It'll look like below until you star
 
 ![image](https://user-images.githubusercontent.com/59971111/192024903-ed629405-ac6f-4263-8005-8863399d227a.png)
 
-At this point you're configured and good to go. Things to note here are that the stats will be inaccurate for the first hour or so that the bridge is running as most of the stats are based on 10-30m averages. Also note that there is a 'wallet_filter' and 'show_balances' toggle near the top of the screen. These filter the database and hide your balance if you don't want that exposed
+At this point you're configured and good to go. Things to note here are that the stats will be inaccurate for the first hour or so that the bridge is running as most of the stats are based on 10-30m averages. Also note that there is a 'wallet_filter' and 'show_balances' toggle near the top of the screen. These filter the database and hide your balance if you don't want that exposed. The monitoring UI is also accessable on any device on your local network (including your phone!) if you use the host computers ip address -- just type in the ip and port such as `http://192.168.0.25/3000` (this is an example, this exact link probablly wont work for you)
 
  
