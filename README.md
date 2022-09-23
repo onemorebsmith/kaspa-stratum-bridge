@@ -22,7 +22,8 @@ Tips appreciated: `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew
 
 Shares-based work allocation with miner-like periodic stat output:
 
-![image](https://user-images.githubusercontent.com/59971111/191881488-eb5a2b58-c6fe-4d97-95fa-7f23a861eb08.png)
+![image](https://user-images.githubusercontent.com/59971111/191983487-479e19ec-a8cb-4edb-afc4-55a1165e79fc.png)
+
 
 
 Optional monitoring UI:
