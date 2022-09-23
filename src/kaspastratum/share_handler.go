@@ -28,59 +28,18 @@ type WorkStats struct {
 }
 
 type shareHandler struct {
-	kaspa     *rpcclient.RPCClient
-	stats     map[string]*WorkStats
-	statsLock sync.Mutex
-	overall   WorkStats
-
-	bufferLock    int32
-	currentTarget *targetBuffer
-}
-
-type targetBuffer struct {
-	DAAScore    uint64
-	Lock        int32
-	FoundShares map[uint64]struct{}
-}
-
-func (tb *targetBuffer) addShare(nonce uint64) bool {
-	for {
-		if atomic.CompareAndSwapInt32(&tb.Lock, 0, 1) {
-			break
-		}
-	}
-	exists := false
-	if _, exists = tb.FoundShares[nonce]; !exists {
-		tb.FoundShares[nonce] = struct{}{}
-	}
-	atomic.StoreInt32(&tb.Lock, 0)
-	return !exists
-}
-
-func (s *shareHandler) getCreateBuffer(DAAScore uint64) *targetBuffer {
-	for {
-		if atomic.CompareAndSwapInt32(&s.bufferLock, 0, 1) {
-			break
-		}
-	}
-	ret := s.currentTarget
-	if s.currentTarget.DAAScore < DAAScore {
-		ret = &targetBuffer{
-			DAAScore:    DAAScore,
-			FoundShares: make(map[uint64]struct{}, 16),
-		}
-		s.currentTarget = ret
-	}
-	atomic.StoreInt32(&s.bufferLock, 0)
-	return ret
+	kaspa        *rpcclient.RPCClient
+	stats        map[string]*WorkStats
+	statsLock    sync.Mutex
+	overall      WorkStats
+	tipBlueScore uint64
 }
 
 func newShareHandler(kaspa *rpcclient.RPCClient) *shareHandler {
 	return &shareHandler{
-		kaspa:         kaspa,
-		stats:         map[string]*WorkStats{},
-		statsLock:     sync.Mutex{},
-		currentTarget: &targetBuffer{},
+		kaspa:     kaspa,
+		stats:     map[string]*WorkStats{},
+		statsLock: sync.Mutex{},
 	}
 }
 
@@ -158,15 +117,22 @@ var (
 	ErrDupeShare  = fmt.Errorf("duplicate share")
 )
 
+// the max difference between tip blue score and job blue score that we'll accept
+// anything greater than this is considered a stale
+const workWindow = 8
+
 func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInfo) error {
-	buffer := sh.getCreateBuffer(si.block.Header.DAAScore)
-	if si.block.Header.DAAScore < buffer.DAAScore {
-		RecordStaleShare(ctx)
-		return errors.Wrapf(ErrStaleShare, "daa %d vs %d", si.block.Header.DAAScore, buffer.DAAScore)
-	} else if !buffer.addShare(si.nonceVal) {
-		RecordDupeShare(ctx)
-		return ErrDupeShare
+	tip := sh.tipBlueScore
+	if si.block.Header.BlueScore > tip {
+		sh.tipBlueScore = si.block.Header.BlueScore
+		return nil // can't be
 	}
+	// buffer := sh.getCreateBuffer(si.block.Header.BlueScore)
+	if (si.block.Header.BlueScore - tip) > workWindow {
+		RecordStaleShare(ctx)
+		return errors.Wrapf(ErrStaleShare, "blueScore %d vs %d", si.block.Header.BlueScore, tip)
+	}
+	// TODO (bs): dupe share tracking
 	return nil
 }
 
@@ -176,7 +142,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		return err
 	}
 
-	ctx.Logger.Debug(submitInfo.block.Header.DAAScore, " submit ", submitInfo.noncestr)
+	ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
 	if GetMiningState(ctx).useBigJob {
 		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
 		if err != nil {
@@ -197,13 +163,15 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 			atomic.AddInt64(&stats.StaleShares, 1)
 			RecordDupeShare(ctx)
 			return ctx.ReplyDupeShare(event.Id)
-		} else /*err == ErrStaleShare*/ {
+		} else if err == ErrStaleShare {
 			ctx.Logger.Info(err.Error())
 			atomic.AddInt64(&stats.StaleShares, 1)
 			RecordStaleShare(ctx)
-			// just record for now
-			//return ctx.ReplyStaleShare(event.Id)
+			return ctx.ReplyStaleShare(event.Id)
 		}
+		// unknown error somehow
+		ctx.Logger.Error("unknown error during check stales: ", err.Error())
+		return ctx.ReplyBadShare(event.Id)
 	}
 
 	converted, err := appmessage.RPCBlockToDomainBlock(submitInfo.block)
@@ -279,37 +247,29 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 func (sh *shareHandler) startStatsThread() error {
 	start := time.Now()
 	for {
+		// console formatting is terrible. Good luck whever touches anything
 		time.Sleep(10 * time.Second)
 		sh.statsLock.Lock()
-		var stales, invalids int64
-		for _, v := range sh.stats {
-			stales += v.StaleShares
-			invalids += v.InvalidShares
-		}
-
-		str := "\n========================================================\n"
-		str += fmt.Sprintf("uptime %s | mined %d | stales %d | invalid %d \n",
-			time.Since(start).Round(time.Second), sh.overall.SharesFound, stales, invalids)
-		str += "--------------------------------------------------------\n"
-		str += "worker\t| avg hashrate\t| a/s/i\t| uptime\n"
-		str += "--------------------------------------------------------\n"
+		str := "\n=============================================================\n"
+		str += "  worker name   |  avg hashrate  |   acc/stl/inv  |   uptime \n"
+		str += "-------------------------------------------------------------\n"
 		var lines []string
 		totalRate := float64(0)
 		for _, v := range sh.stats {
-			// if len(v.WorkerName) == 0 || time.Since(v.LastShare) > time.Minute*5 {
-			// 	continue
-			// }
 			rate := GetAverageHashrateGHz(v)
 			totalRate += rate
-			lines = append(lines, fmt.Sprintf("%s\t| %0.2fGH/s\t| %d/%d/%d\t| %s",
-				v.WorkerName, rate, v.SharesFound, v.StaleShares, v.InvalidShares,
-				time.Since(v.StartTime).Round(time.Second)))
+			rateStr := fmt.Sprintf("%0.2fGH/s", rate) // todo, fix units
+			ratioStr := fmt.Sprintf("%d/%d/%d", v.SharesFound, v.StaleShares, v.InvalidShares)
+			lines = append(lines, fmt.Sprintf("%-16s| %14.14s | %14.14s | %8.8s",
+				v.WorkerName, rateStr, ratioStr, time.Since(v.StartTime).Round(time.Second)))
 		}
 		sort.Strings(lines)
 		str += strings.Join(lines, "\n")
-		str += "\n--------------------------------------------------------\n"
-		str += fmt.Sprintf("total\t| %0.2fGH/s", totalRate)
-		str += "\n======================================== ks_bridge_" + version + "\n"
+		rateStr := fmt.Sprintf("%0.2fGH/s", totalRate) // todo, fix units
+		str += "\n-------------------------------------------------------------\n"
+		str += fmt.Sprintf("mined: %-5d    | %14.14s |                | %8.8s",
+			sh.overall.SharesFound, rateStr, time.Since(start).Round(time.Second))
+		str += "\n============================================= ks_bridge_" + version + "\n"
 		sh.statsLock.Unlock()
 		log.Println(str)
 	}
