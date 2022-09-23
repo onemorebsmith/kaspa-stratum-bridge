@@ -28,7 +28,9 @@ Shares-based work allocation with miner-like periodic stat output:
 
 Optional monitoring UI:
 
-![image](https://user-images.githubusercontent.com/59971111/191881366-61ab410b-5eaa-4e10-8560-af961ca692f6.png)
+https://github.com/onemorebsmith/kaspa-stratum-bridge/blob/main/monitoring-setup.md
+
+![image](https://user-images.githubusercontent.com/59971111/192025446-f20d74a5-f9e0-4290-b98b-9f56af8f23b4.png)
 
 ![image](https://user-images.githubusercontent.com/59971111/191980688-2d0faf6b-d551-4880-a316-de2303cfeb7d.png)
 
