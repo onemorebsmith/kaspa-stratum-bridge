@@ -1,4 +1,3 @@
-
 # Kaspa Stratum Adapter
 
 This is a lightweight daemon that allows mining to a local (or remote) kaspa node using stratum-base miners.
