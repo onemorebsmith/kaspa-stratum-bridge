@@ -163,7 +163,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 			atomic.AddInt64(&stats.StaleShares, 1)
 			RecordDupeShare(ctx)
 			return ctx.ReplyDupeShare(event.Id)
-		} else if err == ErrStaleShare {
+		} else if errors.Is(err, ErrStaleShare) {
 			ctx.Logger.Info(err.Error())
 			atomic.AddInt64(&stats.StaleShares, 1)
 			RecordStaleShare(ctx)
