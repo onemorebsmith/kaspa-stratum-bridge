@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
+	"log"
 	"math/big"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
@@ -19,7 +20,8 @@ const shareValue = float64(2<<(diffPower-1)) / float64(1000000000) // in GH/s
 
 // 🤮 -- difficulty is a decreasing value, so the actual diff val is based on the inverse
 // of the power that we actually want. See the notes in kaspad, they're more coherent
-var fixedDifficulty = BigDiffToLittle(new(big.Int).Lsh(big.NewInt(1), 256-diffPower))
+var fixedDifficultyBI = new(big.Int).Lsh(big.NewInt(1), 256-diffPower)
+var fixedDifficulty = BigDiffToLittle(fixedDifficultyBI)
 
 func SerializeBlockHeader(template *appmessage.RPCBlock) ([]byte, error) {
 	hasher, err := blake2b.New(32, []byte("BlockHash"))
@@ -94,6 +96,26 @@ func GenerateJobHeader(headerData []byte) []uint64 {
 		final = append(final, bb.Uint64())
 	}
 	return final
+}
+
+func GenerateLargeJobParams(headerData []byte, timestamp uint64) string {
+	ids := []uint64{}
+	timestampBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(timestampBytes, timestamp)
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[0:])))
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[8:])))
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[16:])))
+	ids = append(ids, uint64(binary.BigEndian.Uint64(headerData[24:])))
+	ids = append(ids, uint64(binary.LittleEndian.Uint64(timestampBytes)))
+
+	str := fmt.Sprintf("%016x%016x%016x%016x%016x", ids[0], ids[1], ids[2], ids[3], ids[4])
+	if len(str) != 80 {
+		for _, v := range ids {
+			log.Printf("%016x", v)
+		}
+		log.Printf("%s : %d", str, len(str))
+	}
+	return str
 }
 
 var bi = big.NewInt(16777215)

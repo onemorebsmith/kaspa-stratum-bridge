@@ -26,9 +26,5 @@ debug.test
 __debug_bin
 
 cmd/kaspabridge/kaspabridge
-cmd/kaspabridge/bridge.log
-release/ks_bridge_linux
-release/ks_bridge_win64
-release/staging
-release/*.zip
-release/*.tar.gz
+cmd/kaspabridge/bridge.
+release/
