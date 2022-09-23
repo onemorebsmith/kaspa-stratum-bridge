@@ -186,11 +186,13 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
 		return sh.submit(ctx, converted, submitInfo.nonceVal, event.Id)
-	} else if powValue.Cmp(fixedDifficultyBI) >= 0 {
-		ctx.Logger.Warn("weak block")
-		RecordWeakShare(ctx)
-		return ctx.ReplyLowDiffShare(event.Id)
 	}
+	// remove for now until I can figure it out. No harm here as we're not
+	// } else if powValue.Cmp(fixedDifficultyBI) >= 0 {
+	// 	ctx.Logger.Warn("weak block")
+	// 	RecordWeakShare(ctx)
+	// 	return ctx.ReplyLowDiffShare(event.Id)
+	// }
 
 	atomic.AddInt64(&stats.SharesFound, 1)
 	stats.LastShare = time.Now()
