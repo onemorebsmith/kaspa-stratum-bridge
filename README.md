@@ -29,6 +29,8 @@ Optional monitoring UI:
 
 Prometheus API:
 
+If the app is run with the `-prom={port}` flag the application will host stats on the port specified by `{port}`, these stats are documented in the file [prom.go](src/kaspastratum/prom.go). This is intended to be use by prometheus but the stats can be fetched and used independently if desired. `curl http://localhost:2114/metrics | grep ks_` will get a listing of current stats. All published stats have a `ks_` prefix for ease of use.
+
 ```
 user:~$ curl http://localhost:2114/metrics | grep ks_
 # HELP ks_estimated_network_hashrate_gauge Gauge representing the estimated network hashrate
@@ -105,8 +107,13 @@ run `./kaspabridge` in the `cmd/kaspabridge` directory
 
 all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 
-  
+## HiveOs usage
+Example flight sheets. For all examples below the bridge is running on a remote computer `192.168.0.25:5555`. Replace the Pool URL of whatever miner you're using with the IP address of the computer that is running the bridge adapter. Typically this should be the same computer you're running your kaspad node on. 
 
-## Metrics
+![image](https://user-images.githubusercontent.com/59971111/191882641-20b3b79d-249b-4850-b274-5c77ce65cd15.png)
 
-If the app is run with the `-prom={port}` flag the application will host stats on the port specified by `{port}`, these stats are documented in the file [prom.go](src/kaspastratum/prom.go). This is intended to be use by prometheus but the stats can be fetched and used independently if desired. `curl http://localhost:2114/metrics | grep ks_` will get a listing of current stats. All published stats have a `ks_` prefix for ease of use.
+lolminer dual:
+
+![image](https://user-images.githubusercontent.com/59971111/191882867-3d170507-24b2-4e9a-b60a-0d9b3a4ae410.png)
+
+
