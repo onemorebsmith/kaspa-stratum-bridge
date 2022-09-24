@@ -37,7 +37,7 @@ You may point your miners the IP address of the computer you installed on at por
 
 ## Accessing grafana
 
-Assuming the setup went correctly you'll be able to access grafana buy visiting http://127.0.0.1:3000
+Assuming the setup went correctly you'll be able to access grafana by visiting http://127.0.0.1:3000
 
 ![image](https://user-images.githubusercontent.com/59971111/192024515-dd487a3a-3d15-4d21-bfbf-189b2db69782.png)
 
