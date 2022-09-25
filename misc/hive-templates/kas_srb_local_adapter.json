@@ -24,7 +24,7 @@
                 "url": "YOUR_KASPAD_NODE_IP_HERE:16110",
                 "miner": "ks_bridge",
                 "template": "doesnt.matter",
-                "install_url": "https://github.com/onemorebsmith/kaspa-stratum-bridge/releases/download/v1.1/ks_bridge-1.1_hive.tar.gz"
+                "install_url": "https://github.com/onemorebsmith/kaspa-stratum-bridge/releases/download/v1.1.2/ks_bridge-1.1.2_hive.tar.gz"
             },
             "pool_geo": []
         }
