@@ -127,8 +127,7 @@ func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInf
 		sh.tipBlueScore = si.block.Header.BlueScore
 		return nil // can't be
 	}
-	// buffer := sh.getCreateBuffer(si.block.Header.BlueScore)
-	if (si.block.Header.BlueScore - tip) > workWindow {
+	if tip-si.block.Header.BlueScore > workWindow {
 		RecordStaleShare(ctx)
 		return errors.Wrapf(ErrStaleShare, "blueScore %d vs %d", si.block.Header.BlueScore, tip)
 	}
@@ -159,12 +158,12 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	stats := sh.getCreateStats(ctx)
 	if err := sh.checkStales(ctx, submitInfo); err != nil {
 		if err == ErrDupeShare {
-			ctx.Logger.Info("dupe share " + submitInfo.noncestr)
+			ctx.Logger.Info("dupe share "+submitInfo.noncestr, ctx.WorkerName, ctx.WalletAddr)
 			atomic.AddInt64(&stats.StaleShares, 1)
 			RecordDupeShare(ctx)
 			return ctx.ReplyDupeShare(event.Id)
 		} else if errors.Is(err, ErrStaleShare) {
-			ctx.Logger.Info(err.Error())
+			ctx.Logger.Info(err.Error(), ctx.WorkerName, ctx.WalletAddr)
 			atomic.AddInt64(&stats.StaleShares, 1)
 			RecordStaleShare(ctx)
 			return ctx.ReplyStaleShare(event.Id)

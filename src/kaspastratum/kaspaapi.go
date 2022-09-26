@@ -63,6 +63,10 @@ func (ks *KaspaApi) startStatsThread(ctx context.Context) {
 }
 
 func (ks *KaspaApi) reconnect() error {
+	if ks.kaspad != nil {
+		return ks.kaspad.Reconnect()
+	}
+
 	client, err := rpcclient.NewRPCClient(ks.address)
 	if err != nil {
 		return err

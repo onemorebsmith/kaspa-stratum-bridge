@@ -30,6 +30,11 @@ func (sc *StratumContext) Connected() bool {
 	return !sc.disconnecting
 }
 
+func (sc *StratumContext) String() string {
+	serialized, _ := json.Marshal(sc)
+	return string(serialized)
+}
+
 func (sc *StratumContext) Reply(response JsonRpcResponse) error {
 	if sc.disconnecting {
 		return ErrorDisconnected
@@ -87,6 +92,11 @@ func (sc *StratumContext) ReplyLowDiffShare(id any) error {
 		Result: nil,
 		Error:  []any{23, "Invalid difficulty", nil},
 	})
+}
+
+func (sc *StratumContext) Disconnect() {
+	sc.disconnecting = true
+	sc.onDisconnect <- sc
 }
 
 func (sc *StratumContext) checkDisconnect(err error) {

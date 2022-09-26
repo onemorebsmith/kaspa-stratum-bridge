@@ -2,6 +2,8 @@ package kaspastratum
 
 import (
 	"context"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"github.com/mattn/go-colorable"
@@ -13,11 +15,12 @@ import (
 const version = "v1.1"
 
 type BridgeConfig struct {
-	StratumPort string `yaml:"stratum_port"`
-	RPCServer   string `yaml:"kaspad_address"`
-	PromPort    string `yaml:"prom_port"`
-	PrintStats  bool   `yaml:"print_stats"`
-	UseLogFile  bool   `yaml:"log_to_file"`
+	StratumPort     string `yaml:"stratum_port"`
+	RPCServer       string `yaml:"kaspad_address"`
+	PromPort        string `yaml:"prom_port"`
+	PrintStats      bool   `yaml:"print_stats"`
+	UseLogFile      bool   `yaml:"log_to_file"`
+	HealthCheckPort string `yaml:"health_check_port"`
 }
 
 func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
@@ -54,6 +57,14 @@ func ListenAndServe(cfg BridgeConfig) error {
 	ksApi, err := NewKaspaAPI(cfg.RPCServer, logger)
 	if err != nil {
 		return err
+	}
+
+	if cfg.HealthCheckPort != "" {
+		logger.Info("enabling health check on port " + cfg.HealthCheckPort)
+		http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		go http.ListenAndServe(cfg.HealthCheckPort, nil)
 	}
 
 	shareHandler := newShareHandler(ksApi.kaspad)

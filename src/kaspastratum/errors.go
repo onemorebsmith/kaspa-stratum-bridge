@@ -3,6 +3,7 @@ package kaspastratum
 type ErrorShortCodeT string
 
 const (
+	ErrNoMinerAddress   ErrorShortCodeT = "err_no_miner_address"
 	ErrFailedBlockFetch ErrorShortCodeT = "err_failed_block_fetch"
 	ErrMissingJob       ErrorShortCodeT = "err_missing_job"
 	ErrBadDataFromMiner ErrorShortCodeT = "err_bad_data_from_miner"

@@ -13,11 +13,14 @@ import (
 
 var bigJobRegex = regexp.MustCompile(".*BzMiner.*")
 
+const balanceDelay = time.Minute
+
 type clientListener struct {
-	logger       *zap.SugaredLogger
-	shareHandler *shareHandler
-	clientLock   sync.RWMutex
-	clients      map[string]*gostratum.StratumContext
+	logger           *zap.SugaredLogger
+	shareHandler     *shareHandler
+	clientLock       sync.RWMutex
+	clients          map[string]*gostratum.StratumContext
+	lastBalanceCheck time.Time
 }
 
 func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler) *clientListener {
@@ -56,12 +59,14 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			continue
 		}
 		go func(client *gostratum.StratumContext) {
-			state := GetMiningState(client)
 			if client.WalletAddr == "" {
-				RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
-				return // not ready
+				// this happens pretty frequently in gcp/aws land since script-kiddies scrape ports
+				client.Logger.Warn("client is not ready, no miner address specified - disconnecting", client.String())
+				RecordWorkerError(client.WalletAddr, ErrNoMinerAddress)
+				client.Disconnect() // invalid configuration, boot the worker
+				return
 			}
-
+			state := GetMiningState(client)
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
 				RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
@@ -118,18 +123,24 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 
 			RecordNewJob(client)
 		}(c)
-		addresses = append(addresses, c.WalletAddr)
+
+		if c.WalletAddr != "" {
+			addresses = append(addresses, c.WalletAddr)
+		}
 	}
 	c.clientLock.Unlock()
 
-	if len(addresses) > 0 {
-		go func() {
-			balances, err := kapi.kaspad.GetBalancesByAddresses(addresses)
-			if err != nil {
-				c.logger.Warn("failed to get balances from kaspa, prom stats will be out of date", zap.Error(err))
-				return
-			}
-			RecordBalances(balances)
-		}()
+	if time.Since(c.lastBalanceCheck) > balanceDelay {
+		c.lastBalanceCheck = time.Now()
+		if len(addresses) > 0 {
+			go func() {
+				balances, err := kapi.kaspad.GetBalancesByAddresses(addresses)
+				if err != nil {
+					c.logger.Warn("failed to get balances from kaspa, prom stats will be out of date", zap.Error(err))
+					return
+				}
+				RecordBalances(balances)
+			}()
+		}
 	}
 }
