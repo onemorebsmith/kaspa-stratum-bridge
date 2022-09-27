@@ -156,22 +156,22 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		}
 	}
 	stats := sh.getCreateStats(ctx)
-	if err := sh.checkStales(ctx, submitInfo); err != nil {
-		if err == ErrDupeShare {
-			ctx.Logger.Info("dupe share "+submitInfo.noncestr, ctx.WorkerName, ctx.WalletAddr)
-			atomic.AddInt64(&stats.StaleShares, 1)
-			RecordDupeShare(ctx)
-			return ctx.ReplyDupeShare(event.Id)
-		} else if errors.Is(err, ErrStaleShare) {
-			ctx.Logger.Info(err.Error(), ctx.WorkerName, ctx.WalletAddr)
-			atomic.AddInt64(&stats.StaleShares, 1)
-			RecordStaleShare(ctx)
-			return ctx.ReplyStaleShare(event.Id)
-		}
-		// unknown error somehow
-		ctx.Logger.Error("unknown error during check stales: ", err.Error())
-		return ctx.ReplyBadShare(event.Id)
-	}
+	// if err := sh.checkStales(ctx, submitInfo); err != nil {
+	// 	if err == ErrDupeShare {
+	// 		ctx.Logger.Info("dupe share "+submitInfo.noncestr, ctx.WorkerName, ctx.WalletAddr)
+	// 		atomic.AddInt64(&stats.StaleShares, 1)
+	// 		RecordDupeShare(ctx)
+	// 		return ctx.ReplyDupeShare(event.Id)
+	// 	} else if errors.Is(err, ErrStaleShare) {
+	// 		ctx.Logger.Info(err.Error(), ctx.WorkerName, ctx.WalletAddr)
+	// 		atomic.AddInt64(&stats.StaleShares, 1)
+	// 		RecordStaleShare(ctx)
+	// 		return ctx.ReplyStaleShare(event.Id)
+	// 	}
+	// 	// unknown error somehow
+	// 	ctx.Logger.Error("unknown error during check stales: ", err.Error())
+	// 	return ctx.ReplyBadShare(event.Id)
+	// }
 
 	converted, err := appmessage.RPCBlockToDomainBlock(submitInfo.block)
 	if err != nil {
