@@ -13,9 +13,11 @@ Huge shoutout to https://github.com/KaffinPX/KStratum for the inspiration
   
 Tips appreciated: `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp`
 
+Try my 0-fee [Kaspa Solo Pool](http://grafana.ghost-pool.io/d/x7cE7G74k/pool-monitoring?orgId=1&refresh=30s&var-show_balances=0&var-wallet_filter=All) built with this code!
+
 
 ## Hive Setup
-[detailed instructions here](hive-setup.md)
+[detailed instructions here](hive-setup.md) 
 
 
 # Features:
