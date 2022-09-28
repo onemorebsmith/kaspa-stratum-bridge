@@ -212,7 +212,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 		Transactions: block.Transactions,
 	})
 	// print after the submit to get it submitted faster
-	ctx.Logger.Info("submitted block to kaspad")
+	ctx.Logger.Info("submitted block to kaspad", ctx.String())
 	ctx.Logger.Info(fmt.Sprintf("Submitted nonce: %d", nonce))
 
 	if err != nil {
@@ -239,7 +239,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	stats.LastShare = time.Now()
 	atomic.AddInt64(&stats.SharesFound, 1)
 	atomic.AddInt64(&sh.overall.SharesFound, 1)
-	RecordBlockFound(ctx)
+	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore())
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Result: true,
 	})
