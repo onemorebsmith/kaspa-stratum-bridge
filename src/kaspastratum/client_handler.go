@@ -59,14 +59,16 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			continue
 		}
 		go func(client *gostratum.StratumContext) {
+			state := GetMiningState(client)
 			if client.WalletAddr == "" {
-				// this happens pretty frequently in gcp/aws land since script-kiddies scrape ports
-				client.Logger.Warn("client is not ready, no miner address specified - disconnecting", client.String())
-				RecordWorkerError(client.WalletAddr, ErrNoMinerAddress)
-				client.Disconnect() // invalid configuration, boot the worker
+				if time.Since(state.connectTime) > time.Second*20 { // timeout passed
+					// this happens pretty frequently in gcp/aws land since script-kiddies scrape ports
+					client.Logger.Warn("client misconfigured, no miner address specified - disconnecting", client.String())
+					RecordWorkerError(client.WalletAddr, ErrNoMinerAddress)
+					client.Disconnect() // invalid configuration, boot the worker
+				}
 				return
 			}
-			state := GetMiningState(client)
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
 				RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)

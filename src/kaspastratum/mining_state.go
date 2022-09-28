@@ -3,6 +3,7 @@ package kaspastratum
 import (
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
@@ -17,12 +18,14 @@ type MiningState struct {
 	bigDiff     big.Int
 	initialized bool
 	useBigJob   bool
+	connectTime time.Time
 }
 
 func MiningStateGenerator() any {
 	return &MiningState{
-		Jobs:    map[int]*appmessage.RPCBlock{},
-		JobLock: sync.Mutex{},
+		Jobs:        map[int]*appmessage.RPCBlock{},
+		JobLock:     sync.Mutex{},
+		connectTime: time.Now(),
 	}
 }
 
