@@ -225,7 +225,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 			RecordStaleShare(ctx)
 			return ctx.ReplyStaleShare(eventId)
 		} else {
-			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow")
+			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow", err.Error())
 			atomic.AddInt64(&sh.getCreateStats(ctx).InvalidShares, 1)
 			atomic.AddInt64(&sh.overall.InvalidShares, 1)
 			RecordInvalidShare(ctx)
