@@ -80,7 +80,7 @@ type submitInfo struct {
 }
 
 func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) (*submitInfo, error) {
-	if len(event.Params) < 2 {
+	if len(event.Params) < 3 {
 		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return nil, fmt.Errorf("malformed event, expected at least 2 params")
 	}
