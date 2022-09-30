@@ -13,10 +13,7 @@ import (
 )
 
 func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumListener) error {
-	defer func() {
-		connection.Close()
-		s.disconnectChannel <- ctx
-	}()
+	defer ctx.Disconnect()
 
 	for {
 		err := readFromConnection(connection, func(line string) error {
