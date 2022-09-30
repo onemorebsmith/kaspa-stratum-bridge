@@ -73,7 +73,10 @@ func ListenAndServe(cfg BridgeConfig) error {
 	// override the submit handler with an actual useful handler
 	handlers[string(gostratum.StratumMethodSubmit)] =
 		func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
-			return shareHandler.HandleSubmit(ctx, event)
+			if err := shareHandler.HandleSubmit(ctx, event); err != nil {
+				ctx.Logger.Error(err) // sink error
+			}
+			return nil
 		}
 
 	stratumConfig := gostratum.StratumListenerConfig{
