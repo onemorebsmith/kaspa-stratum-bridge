@@ -61,6 +61,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	}
 	ctx.WalletAddr = address
 	ctx.WorkerName = workerName
+	ctx.Logger = ctx.Logger.With(zap.String("worker", ctx.WorkerName), zap.String("addr", ctx.WalletAddr))
 
 	if err := ctx.Reply(NewResponse(event, true, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to authorize")

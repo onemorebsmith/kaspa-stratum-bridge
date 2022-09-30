@@ -35,10 +35,9 @@ func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler) *c
 }
 
 func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
-	c.clientLock.Lock()
-	c.clientCounter++
 	idx := atomic.AddInt32(&c.clientCounter, 1)
 	ctx.Id = idx
+	c.clientLock.Lock()
 	c.clients[idx] = ctx
 	c.clientLock.Unlock()
 	ctx.Logger = ctx.Logger.With(zap.Int("client_id", int(ctx.Id)))
@@ -52,6 +51,7 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	ctx.Done()
 	c.clientLock.Lock()
+	c.logger.Info("removing client ", ctx.Id)
 	delete(c.clients, ctx.Id)
 	c.clientLock.Unlock()
 	RecordDisconnect(ctx)

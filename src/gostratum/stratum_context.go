@@ -97,6 +97,7 @@ func (sc *StratumContext) ReplyLowDiffShare(id any) error {
 
 func (sc *StratumContext) Disconnect() {
 	if !sc.disconnecting {
+		sc.Logger.Info("disconnecting")
 		sc.disconnecting = true
 		if sc.connection != nil {
 			sc.connection.Close()
