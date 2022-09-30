@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
@@ -19,8 +20,9 @@ type clientListener struct {
 	logger           *zap.SugaredLogger
 	shareHandler     *shareHandler
 	clientLock       sync.RWMutex
-	clients          map[string]*gostratum.StratumContext
+	clients          map[int32]*gostratum.StratumContext
 	lastBalanceCheck time.Time
+	clientCounter    int32
 }
 
 func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler) *clientListener {
@@ -28,14 +30,18 @@ func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler) *c
 		logger:       logger,
 		clientLock:   sync.RWMutex{},
 		shareHandler: shareHandler,
-		clients:      make(map[string]*gostratum.StratumContext),
+		clients:      make(map[int32]*gostratum.StratumContext),
 	}
 }
 
 func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 	c.clientLock.Lock()
-	c.clients[ctx.RemoteAddr] = ctx
+	c.clientCounter++
+	idx := atomic.AddInt32(&c.clientCounter, 1)
+	ctx.Id = idx
+	c.clients[idx] = ctx
 	c.clientLock.Unlock()
+	ctx.Logger = ctx.Logger.With(zap.Int("client_id", int(ctx.Id)))
 	go func() {
 		// hacky, but give time for the authorize to go through so we can use the worker name
 		time.Sleep(5 * time.Second)
@@ -46,7 +52,7 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	ctx.Done()
 	c.clientLock.Lock()
-	delete(c.clients, ctx.RemoteAddr)
+	delete(c.clients, ctx.Id)
 	c.clientLock.Unlock()
 	RecordDisconnect(ctx)
 }

@@ -17,6 +17,7 @@ type StratumContext struct {
 	WalletAddr    string
 	WorkerName    string
 	RemoteApp     string
+	Id            int32
 	Logger        *zap.SugaredLogger
 	connection    net.Conn
 	disconnecting bool
