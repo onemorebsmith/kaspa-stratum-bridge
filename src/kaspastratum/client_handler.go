@@ -3,6 +3,7 @@ package kaspastratum
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -77,8 +78,14 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			}
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
-				RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
-				client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
+				if strings.Contains(err.Error(), "Could not decode address") {
+					RecordWorkerError(client.WalletAddr, ErrInvalidAddressFmt)
+					client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa, malformed address: %s", err))
+					client.Disconnect() // unrecoverable
+				} else {
+					RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
+					client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
+				}
 				return
 			}
 			state.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
