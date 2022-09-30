@@ -1,5 +1,3 @@
-## issues have been report with miners freezing using bzminer 11.1.0 
-
 # Kaspa Stratum Adapter
 
 This is a lightweight daemon that allows mining to a local (or remote) kaspa node using stratum-base miners.
