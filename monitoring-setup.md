@@ -1,4 +1,6 @@
-# Configuring the monitoring setup (Grafana + Prom)
+# Configuring monitoring (Grafana + Prom)
+
+Easiest setup, [join my 0-fee solo pool](http://grafana.ghost-pool.io/d/x7cE7G74k/pool-monitoring?orgId=1&refresh=5s)
 
 ## Reqirements
 
