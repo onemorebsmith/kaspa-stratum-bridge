@@ -108,8 +108,7 @@ func (sc *StratumContext) Disconnect() {
 
 func (sc *StratumContext) checkDisconnect(err error) {
 	if err != nil { // actual error
-		sc.disconnecting = true
-		sc.onDisconnect <- sc
+		sc.Disconnect()
 	}
 }
 
