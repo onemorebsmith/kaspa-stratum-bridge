@@ -108,7 +108,7 @@ func (sc *StratumContext) Disconnect() {
 
 func (sc *StratumContext) checkDisconnect(err error) {
 	if err != nil { // actual error
-		sc.Disconnect()
+		go sc.Disconnect() // potentially blocking, so async it
 	}
 }
 

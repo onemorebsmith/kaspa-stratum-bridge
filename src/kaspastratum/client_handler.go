@@ -54,6 +54,7 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	c.clientLock.Lock()
 	c.logger.Info("removing client ", ctx.Id)
 	delete(c.clients, ctx.Id)
+	c.logger.Info("removed client ", ctx.Id)
 	c.clientLock.Unlock()
 	RecordDisconnect(ctx)
 }
@@ -132,8 +133,7 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 					return
 				}
 				RecordWorkerError(client.WalletAddr, ErrFailedSendWork)
-				client.Logger.Error(errors.Wrap(err, "failed sending work packet").Error(),
-					zap.Any("context", client))
+				client.Logger.Error(errors.Wrapf(err, "failed sending work packet %s", jobId).Error())
 			}
 
 			RecordNewJob(client)

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const version = "v1.1"
+const version = "v1.1.4"
 
 type BridgeConfig struct {
 	StratumPort     string `yaml:"stratum_port"`
