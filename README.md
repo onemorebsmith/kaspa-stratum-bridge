@@ -6,6 +6,7 @@ This daemon is confirmed working with the miners below in both dual-mining and k
 * bzminer
 * lolminer
 * srbminer
+* teamreadminer
 
 No fee, forever. Do what you want with it.
 
