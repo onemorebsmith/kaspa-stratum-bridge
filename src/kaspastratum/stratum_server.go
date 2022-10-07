@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const version = "v1.1"
+const version = "v1.1.5"
 
 type BridgeConfig struct {
 	StratumPort     string `yaml:"stratum_port"`
@@ -73,7 +73,10 @@ func ListenAndServe(cfg BridgeConfig) error {
 	// override the submit handler with an actual useful handler
 	handlers[string(gostratum.StratumMethodSubmit)] =
 		func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
-			return shareHandler.HandleSubmit(ctx, event)
+			if err := shareHandler.HandleSubmit(ctx, event); err != nil {
+				ctx.Logger.Error(err) // sink error
+			}
+			return nil
 		}
 
 	stratumConfig := gostratum.StratumListenerConfig{
@@ -94,7 +97,5 @@ func ListenAndServe(cfg BridgeConfig) error {
 		go shareHandler.startStatsThread()
 	}
 
-	server := gostratum.NewListener(stratumConfig)
-	server.Listen(context.Background())
-	return nil
+	return gostratum.NewListener(stratumConfig).Listen(context.Background())
 }

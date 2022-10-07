@@ -3,6 +3,7 @@ package kaspastratum
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,10 +36,9 @@ func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler) *c
 }
 
 func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
-	c.clientLock.Lock()
-	c.clientCounter++
 	idx := atomic.AddInt32(&c.clientCounter, 1)
 	ctx.Id = idx
+	c.clientLock.Lock()
 	c.clients[idx] = ctx
 	c.clientLock.Unlock()
 	ctx.Logger = ctx.Logger.With(zap.Int("client_id", int(ctx.Id)))
@@ -52,7 +52,9 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	ctx.Done()
 	c.clientLock.Lock()
+	c.logger.Info("removing client ", ctx.Id)
 	delete(c.clients, ctx.Id)
+	c.logger.Info("removed client ", ctx.Id)
 	c.clientLock.Unlock()
 	RecordDisconnect(ctx)
 }
@@ -77,8 +79,14 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			}
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
-				RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
-				client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
+				if strings.Contains(err.Error(), "Could not decode address") {
+					RecordWorkerError(client.WalletAddr, ErrInvalidAddressFmt)
+					client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa, malformed address: %s", err))
+					client.Disconnect() // unrecoverable
+				} else {
+					RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
+					client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
+				}
 				return
 			}
 			state.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
@@ -125,8 +133,7 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 					return
 				}
 				RecordWorkerError(client.WalletAddr, ErrFailedSendWork)
-				client.Logger.Error(errors.Wrap(err, "failed sending work packet").Error(),
-					zap.Any("context", client))
+				client.Logger.Error(errors.Wrapf(err, "failed sending work packet %d", jobId).Error())
 			}
 
 			RecordNewJob(client)
