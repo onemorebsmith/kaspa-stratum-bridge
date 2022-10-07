@@ -133,7 +133,7 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 					return
 				}
 				RecordWorkerError(client.WalletAddr, ErrFailedSendWork)
-				client.Logger.Error(errors.Wrapf(err, "failed sending work packet %s", jobId).Error())
+				client.Logger.Error(errors.Wrapf(err, "failed sending work packet %d", jobId).Error())
 			}
 
 			RecordNewJob(client)

@@ -17,7 +17,7 @@ func TestPromValid(t *testing.T) {
 	RecordDupeShare(&ctx)
 	RecordInvalidShare(&ctx)
 	RecordWeakShare(&ctx)
-	RecordBlockFound(&ctx, 10000, 12345)
+	RecordBlockFound(&ctx, 10000, 12345, "abcdefg")
 	RecordDisconnect(&ctx)
 	RecordNewJob(&ctx)
 	RecordNetworkStats(1234, 5678, 910)

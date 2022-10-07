@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const version = "v1.1.4"
+const version = "v1.1.5"
 
 type BridgeConfig struct {
 	StratumPort     string `yaml:"stratum_port"`
@@ -97,7 +97,5 @@ func ListenAndServe(cfg BridgeConfig) error {
 		go shareHandler.startStatsThread()
 	}
 
-	server := gostratum.NewListener(stratumConfig)
-	server.Listen(context.Background())
-	return nil
+	return gostratum.NewListener(stratumConfig).Listen(context.Background())
 }

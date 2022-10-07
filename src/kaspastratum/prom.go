@@ -35,7 +35,7 @@ var blockCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 var blockGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "ks_mined_blocks_gauge",
 	Help: "Gauge containing 1 unique instance per block mined",
-}, append(workerLabels, "nonce", "bluescore"))
+}, append(workerLabels, "nonce", "bluescore", "hash"))
 
 var disconnectCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "ks_worker_disconnect_counter",
@@ -109,11 +109,12 @@ func RecordWeakShare(worker *gostratum.StratumContext) {
 	invalidCounter.With(labels).Inc()
 }
 
-func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64) {
+func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64, hash string) {
 	blockCounter.With(commonLabels(worker)).Inc()
 	labels := commonLabels(worker)
 	labels["nonce"] = fmt.Sprintf("%d", nonce)
 	labels["bluescore"] = fmt.Sprintf("%d", bluescore)
+	labels["hash"] = fmt.Sprintf("%d", bluescore)
 	blockGauge.With(labels).Set(1)
 }
 

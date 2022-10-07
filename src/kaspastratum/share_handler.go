@@ -12,6 +12,7 @@ import (
 
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
+	"github.com/kaspanet/kaspad/domain/consensus/utils/consensushashing"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
@@ -207,13 +208,14 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	block *externalapi.DomainBlock, nonce uint64, eventId any) error {
 	mutable := block.Header.ToMutable()
 	mutable.SetNonce(nonce)
-	_, err := sh.kaspa.SubmitBlock(&externalapi.DomainBlock{
+	block = &externalapi.DomainBlock{
 		Header:       mutable.ToImmutable(),
 		Transactions: block.Transactions,
-	})
+	}
+	_, err := sh.kaspa.SubmitBlock(block)
+	blockhash := consensushashing.BlockHash(block)
 	// print after the submit to get it submitted faster
-	ctx.Logger.Info("submitted block to kaspad", ctx.String())
-	ctx.Logger.Info(fmt.Sprintf("Submitted nonce: %d", nonce))
+	ctx.Logger.Info(fmt.Sprintf("Submitted block %s", blockhash))
 
 	if err != nil {
 		// :'(
@@ -234,12 +236,12 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	}
 
 	// :)
-	ctx.Logger.Info("block accepted")
+	ctx.Logger.Info(fmt.Sprintf("block accepted %s", blockhash))
 	stats := sh.getCreateStats(ctx)
 	stats.LastShare = time.Now()
 	atomic.AddInt64(&stats.SharesFound, 1)
 	atomic.AddInt64(&sh.overall.SharesFound, 1)
-	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore())
+	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore(), blockhash.String())
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Result: true,
 	})
