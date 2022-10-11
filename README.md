@@ -91,12 +91,12 @@ Most of the stats on the graph are averaged over an hour time period, so keep in
 
 Note: This does not require pulling down the repo, it only requires that docker is installed.
 
-`docker run -p 5555:5555 onemorebsmith/kaspa_bridge:latest` will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections.
+`docker run -p 5555:5555 onemorebsmith/kaspa_bridge:latest --log=false` will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections.
 
 
 Detailed:
 
-`docker run -p {stratum_port}:5555 onemorebsmith/kaspa_bridge --kaspa {kaspad_address} --stats {false}` will run the bridge targeting a kaspad node at {kaspad_address}. stratum port accepting connections on {stratum_port}, and only logging connection activity, found blocks, and errors
+`docker run -p {stratum_port}:5555 onemorebsmith/kaspa_bridge  --log=false --kaspa {kaspad_address} --stats {false}` will run the bridge targeting a kaspad node at {kaspad_address}. stratum port accepting connections on {stratum_port}, and only logging connection activity, found blocks, and errors
 
   
 
