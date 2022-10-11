@@ -96,7 +96,7 @@ Note: This does not require pulling down the repo, it only requires that docker 
 
 Detailed:
 
-`docker run -p {stratum_port}:5555 onemorebsmith/kaspa_bridge  --log=false --kaspa {kaspad_address} --stats {false}` will run the bridge targeting a kaspad node at {kaspad_address}. stratum port accepting connections on {stratum_port}, and only logging connection activity, found blocks, and errors
+`docker run -p {stratum_port}:5555 onemorebsmith/kaspa_bridge  --log=false --kaspa={kaspad_address} --stats={false}` will run the bridge targeting a kaspad node at {kaspad_address}. stratum port accepting connections on {stratum_port}, and only logging connection activity, found blocks, and errors
 
   
 
