@@ -15,7 +15,7 @@ import (
 
 // Diff magic numbers:
 // these are a pair, if you change one you need to change the other
-const diffPower = 34
+const diffPower = 37
 const shareValue = float64(2<<(diffPower-1)) / float64(1000000000) // in GH/s
 
 // 🤮 -- difficulty is a decreasing value, so the actual diff val is based on the inverse

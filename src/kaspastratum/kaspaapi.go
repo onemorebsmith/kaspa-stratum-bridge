@@ -3,6 +3,7 @@ package kaspastratum
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
@@ -13,23 +14,25 @@ import (
 )
 
 type KaspaApi struct {
-	address   string
-	logger    *zap.SugaredLogger
-	kaspad    *rpcclient.RPCClient
-	connected bool
+	address       string
+	blockWaitTime string
+	logger        *zap.SugaredLogger
+	kaspad        *rpcclient.RPCClient
+	connected     bool
 }
 
-func NewKaspaAPI(address string, logger *zap.SugaredLogger) (*KaspaApi, error) {
+func NewKaspaAPI(address string, blockWaitTime string, logger *zap.SugaredLogger) (*KaspaApi, error) {
 	client, err := rpcclient.NewRPCClient(address)
 	if err != nil {
 		return nil, err
 	}
 
 	return &KaspaApi{
-		address:   address,
-		logger:    logger.With(zap.String("component", "kaspaapi:"+address)),
-		kaspad:    client,
-		connected: true,
+		address:       address,
+		blockWaitTime: blockWaitTime,
+		logger:        logger.With(zap.String("component", "kaspaapi:"+address)),
+		kaspad:        client,
+		connected:     true,
 	}, nil
 }
 
@@ -105,7 +108,11 @@ func (s *KaspaApi) startBlockTemplateListener(ctx context.Context, blockReadyCb 
 		s.logger.Error("fatal: failed to register for block notifications from kaspa")
 	}
 
-	const tickerTime = 500 * time.Millisecond
+	i, err := strconv.ParseUint(s.blockWaitTime, 10, 64)
+	if err != nil {
+		i = 500
+	}
+	tickerTime := time.Duration(i) * time.Millisecond
 	ticker := time.NewTicker(tickerTime)
 	for {
 		if err := s.waitForSync(false); err != nil {

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const version = "v1.1.5"
+const version = "v1.1.6"
 
 type BridgeConfig struct {
 	StratumPort     string `yaml:"stratum_port"`
@@ -21,6 +21,7 @@ type BridgeConfig struct {
 	PrintStats      bool   `yaml:"print_stats"`
 	UseLogFile      bool   `yaml:"log_to_file"`
 	HealthCheckPort string `yaml:"health_check_port"`
+	BlockWaitTime   string `yaml:"block_wait_time"`
 }
 
 func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
@@ -54,7 +55,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 		StartPromServer(logger, cfg.PromPort)
 	}
 
-	ksApi, err := NewKaspaAPI(cfg.RPCServer, logger)
+	ksApi, err := NewKaspaAPI(cfg.RPCServer, cfg.BlockWaitTime, logger)
 	if err != nil {
 		return err
 	}

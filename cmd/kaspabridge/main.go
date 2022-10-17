@@ -29,6 +29,7 @@ func main() {
 	flag.StringVar(&cfg.StratumPort, "stratum", cfg.StratumPort, "stratum port to listen on, default `:5555`")
 	flag.BoolVar(&cfg.PrintStats, "stats", cfg.PrintStats, "true to show periodic stats to console, default `true`")
 	flag.StringVar(&cfg.RPCServer, "kaspa", cfg.RPCServer, "address of the kaspad node, default `localhost:16110`")
+	flag.StringVar(&cfg.BlockWaitTime, "blockwait", cfg.BlockWaitTime, "time in ms to wait before manually requesting new block, default `500`")
 	flag.StringVar(&cfg.PromPort, "prom", cfg.PromPort, "address to serve prom stats, default `:2112`")
 	flag.BoolVar(&cfg.UseLogFile, "log", cfg.UseLogFile, "if true will output errors to log file, default `true`")
 	flag.StringVar(&cfg.HealthCheckPort, "hcp", cfg.HealthCheckPort, `(rarely used) if defined will expose a health check on /readyz, default ""`)
@@ -41,6 +42,7 @@ func main() {
 	log.Printf("\tprom:          %s", cfg.PromPort)
 	log.Printf("\tstats:         %t", cfg.PrintStats)
 	log.Printf("\tlog:           %t", cfg.UseLogFile)
+	log.Printf("\tblock wait:    %s", cfg.BlockWaitTime)
 	log.Printf("\thealth check:  %s", cfg.HealthCheckPort)
 	log.Println("----------------------------------")
 
