@@ -60,8 +60,12 @@ func TestHeaderSerialization(t *testing.T) {
 }
 
 func TestPoolHzCalculation(t *testing.T) {
-	log.Println(shareValue)
-	log.Println(fixedDifficulty)
+	// TODO: figure out what we really want to test here.
+	// currently set up diff object to mimic old static settings
+	diff := newKaspaDiff()
+	diff.setDiffValue(4)
+	log.Println(diff.hashValue)
+	log.Println(diff.diffValue)
 	rate := big.Int{} // 1mhz
 	rate.SetUint64(1)
 	rate.Lsh(&rate, 222)

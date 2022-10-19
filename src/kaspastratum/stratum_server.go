@@ -5,6 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strconv"
 
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
@@ -22,6 +23,7 @@ type BridgeConfig struct {
 	UseLogFile      bool   `yaml:"log_to_file"`
 	HealthCheckPort string `yaml:"health_check_port"`
 	BlockWaitTime   string `yaml:"block_wait_time"`
+	MinShareDiff    string `yaml:"min_share_diff"`
 }
 
 func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
@@ -69,7 +71,11 @@ func ListenAndServe(cfg BridgeConfig) error {
 	}
 
 	shareHandler := newShareHandler(ksApi.kaspad)
-	clientHandler := newClientListener(logger, shareHandler)
+	minDiff, err := strconv.ParseFloat(cfg.MinShareDiff, 64)
+	if err != nil {
+		minDiff = 4
+	}
+	clientHandler := newClientListener(logger, shareHandler, minDiff)
 	handlers := gostratum.DefaultHandlers()
 	// override the submit handler with an actual useful handler
 	handlers[string(gostratum.StratumMethodSubmit)] =

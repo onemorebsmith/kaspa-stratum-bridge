@@ -8,8 +8,15 @@ stratum_port: :5555
 # kaspad_address: 46.17.104.200:16110
 kaspad_address: localhost:16110
 
-# block_wait_time: time in ms to wait since last block message before manually
-# requesting a new block
+# min_share_diff: only accept shares of the specified difficulty (or higher) from 
+# the miner(s).  Higher values will reduce the number of shares submitted, thereby 
+# reducing network traffic and server load, while lower values will increase the
+# number of shares submitted, thereby reducing the amount of time needed for 
+# accurate hashrate measurements
+# min_share_diff: 4
+
+# block_wait_time: time in ms to wait since last new block message from kaspad 
+# before manually requesting a new block
 # block_wait_time: 500
 
 # print_stats: if true will print stats to the console, false just workers
@@ -26,4 +33,4 @@ log_to_file: true
 # Note `:PORT` format is needed if not specifiying a specific ip range 
 prom_port: :2114
 
- 
+
