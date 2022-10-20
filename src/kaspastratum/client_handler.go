@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"math"
 
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/pkg/errors"
@@ -25,25 +26,46 @@ type clientListener struct {
 	lastBalanceCheck time.Time
 	clientCounter    int32
 	minShareDiff     float64
+	extranonceSize   int8
+	maxExtranonce    int32
+	nextExtranonce   int32
 }
 
-func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler, minShareDiff float64) *clientListener {
+func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
 	return &clientListener{
-		logger:       logger,
-		minShareDiff: minShareDiff,
-		clientLock:   sync.RWMutex{},
-		shareHandler: shareHandler,
-		clients:      make(map[int32]*gostratum.StratumContext),
+		logger:         logger,
+		minShareDiff:   minShareDiff,
+		extranonceSize: extranonceSize,
+		maxExtranonce:  int32(math.Pow(2, (8 * math.Min(float64(extranonceSize), 3))) - 1),
+		nextExtranonce: 0,
+		clientLock:     sync.RWMutex{},
+		shareHandler:   shareHandler,
+		clients:        make(map[int32]*gostratum.StratumContext),
 	}
 }
 
 func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
+	var extranonce int32
+
 	idx := atomic.AddInt32(&c.clientCounter, 1)
 	ctx.Id = idx
 	c.clientLock.Lock()
+	if c.extranonceSize > 0 {
+		extranonce = c.nextExtranonce
+		if c.nextExtranonce < c.maxExtranonce {
+			c.nextExtranonce++
+		} else {
+			c.nextExtranonce = 0
+			c.logger.Warn("wrapped extranonce! new clients may be duplicating work...")
+		}
+	}
 	c.clients[idx] = ctx
 	c.clientLock.Unlock()
 	ctx.Logger = ctx.Logger.With(zap.Int("client_id", int(ctx.Id)))
+
+	if c.extranonceSize > 0 {
+		ctx.Extranonce = fmt.Sprintf("%0*x", c.extranonceSize * 2, extranonce)
+	}
 	go func() {
 		// hacky, but give time for the authorize to go through so we can use the worker name
 		time.Sleep(5 * time.Second)

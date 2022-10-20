@@ -19,6 +19,16 @@ kaspad_address: localhost:16110
 # before manually requesting a new block
 # block_wait_time: 500
 
+# extranonce_size: size in bytes of extranonce, from 0 (no extranonce) to 3. 
+# With no extranonce (0), all clients will search through the same nonce-space,
+# therefore performing duplicate work unless the miner(s) implement client
+# side nonce randomizing.  More bytes allow for more clients with unique 
+# nonce-spaces (i.e. no overlapping work), but reduces the per client 
+# overall nonce-space (though with 1s block times, this shouldn't really
+# be a concern). 
+# 1 byte = 256 clients, 2 bytes = 65536, 3 bytes = 1677216.
+# extranonce_size: 0
+
 # print_stats: if true will print stats to the console, false just workers
 # joining/disconnecting, blocks found, and errors will be printed
 print_stats: true

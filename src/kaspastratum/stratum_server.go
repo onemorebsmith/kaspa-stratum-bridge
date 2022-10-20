@@ -24,6 +24,7 @@ type BridgeConfig struct {
 	HealthCheckPort string `yaml:"health_check_port"`
 	BlockWaitTime   string `yaml:"block_wait_time"`
 	MinShareDiff    string `yaml:"min_share_diff"`
+	ExtranonceSize  string `yaml:"extranonce_size"`
 }
 
 func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
@@ -75,7 +76,11 @@ func ListenAndServe(cfg BridgeConfig) error {
 	if err != nil {
 		minDiff = 4
 	}
-	clientHandler := newClientListener(logger, shareHandler, minDiff)
+	extranonceSize, err := strconv.ParseInt(cfg.ExtranonceSize, 10, 8)
+	if err != nil {
+		extranonceSize = 0
+	}
+	clientHandler := newClientListener(logger, shareHandler, minDiff, int8(extranonceSize))
 	handlers := gostratum.DefaultHandlers()
 	// override the submit handler with an actual useful handler
 	handlers[string(gostratum.StratumMethodSubmit)] =
