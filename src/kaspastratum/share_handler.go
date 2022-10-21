@@ -144,6 +144,15 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		return err
 	}
 
+	// add extranonce to noncestr if enabled and submitted nonce is shorter than
+	// expected (16 - <extranonce length> characters)
+	if (ctx.Extranonce != "") {
+		extranonce2Len := 16 - len(ctx.Extranonce)
+		if (len(submitInfo.noncestr) <= extranonce2Len) {
+			submitInfo.noncestr = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.noncestr)
+		}
+	}
+
 	ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
 	state := GetMiningState(ctx)
 	if state.useBigJob {
@@ -188,7 +197,9 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
-		return sh.submit(ctx, converted, submitInfo.nonceVal, event.Id)
+		if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
+			return err
+		}
 	}
 	// remove for now until I can figure it out. No harm here as we're not
 	// } else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
@@ -243,13 +254,13 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	// :)
 	ctx.Logger.Info(fmt.Sprintf("block accepted %s", blockhash))
 	stats := sh.getCreateStats(ctx)
-	stats.LastShare = time.Now()
 	stats.BlocksFound.Add(1)
 	sh.overall.BlocksFound.Add(1)
 	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore(), blockhash.String())
-	return ctx.Reply(gostratum.JsonRpcResponse{
-		Result: true,
-	})
+
+	// nil return allows HandleSubmit to record share (blocks are shares too!) and
+	// handle the response to the client
+	return nil
 }
 
 func (sh *shareHandler) startStatsThread() error {
