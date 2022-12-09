@@ -69,6 +69,10 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 		stats.WorkerName = ctx.RemoteAddr
 		stats.StartTime = time.Now()
 		sh.stats[ctx.RemoteAddr] = stats
+
+    // TODO: not sure this is the best place, nor whether we shouldn't be 
+    // resetting on disconnect
+    InitWorkerCounters(ctx)
 	}
 
 	sh.statsLock.Unlock()
@@ -212,7 +216,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	stats.SharesDiff.Add(state.stratumDiff.hashValue)
 	stats.LastShare = time.Now()
 	sh.overall.SharesFound.Add(1)
-	RecordShareFound(ctx)
+	RecordShareFound(ctx, state.stratumDiff.hashValue)
 
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Id:     event.Id,
