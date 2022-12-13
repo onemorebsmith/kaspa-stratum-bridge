@@ -83,10 +83,11 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "count(sum(last_over_time(ks_valid_share_counter{wallet=~\"${wallet_filter}\"}[1m]) - last_over_time(ks_valid_share_counter{wallet=~\"${wallet_filter}\"}[1m] offset 10m)) by (worker) > 0)",
+          "hide": false,
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
-          "refId": "A"
+          "refId": "B"
         }
       ],
       "title": "Connected Workers",
@@ -119,7 +120,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 11,
+        "w": 9,
         "x": 3,
         "y": 0
       },
@@ -195,7 +196,7 @@
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 0,
+          "decimals": 2,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -224,8 +225,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 14,
+        "w": 4,
+        "x": 12,
         "y": 0
       },
       "id": 33,
@@ -243,7 +244,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "value"
       },
@@ -256,9 +257,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "increase(ks_balance_by_wallet_gauge{wallet=~\"${wallet_filter}\"}[${resolution}]) *  ${show_balances}",
+          "expr": "increase(ks_balance_by_wallet_gauge{wallet=~\"${wallet_filter}\"}[${resolution}]) * scalar((coin_price{currency=\"kas\"} * on() vector(${show_balances} == bool 2)) + (${show_balances} * (${show_balances} < bool 2)))",
+          "hide": false,
           "instant": false,
-          "legendFormat": "KAS",
+          "legendFormat": "Rate",
           "range": true,
           "refId": "A"
         }
@@ -277,7 +279,7 @@
             "fixedColor": "green",
             "mode": "fixed"
           },
-          "decimals": 0,
+          "decimals": 2,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -294,8 +296,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 19,
+        "w": 4,
+        "x": 16,
         "y": 0
       },
       "id": 12,
@@ -312,7 +314,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "auto"
       },
@@ -324,13 +326,81 @@
             "uid": "wFbInMnVk"
           },
           "editorMode": "code",
-          "expr": "SUM (ks_balance_by_wallet_gauge{wallet=~\"${wallet_filter}\"}) * ${show_balances}",
-          "legendFormat": "KAS",
+          "expr": "SUM (ks_balance_by_wallet_gauge{wallet=~\"${wallet_filter}\"}) * scalar((coin_price{currency=\"kas\"} * on() vector(${show_balances} == bool 2)) + (${show_balances} * (${show_balances} < bool 2)))",
+          "legendFormat": "Total",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Total Balance",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "decimals": 5,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 44,
+      "maxDataPoints": 96,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {
+          "valueSize": 50
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "coin_price{currency=\"kas\"}",
+          "legendFormat": "USD/KAS",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "KAS Price",
       "type": "stat"
     },
     {
@@ -362,7 +432,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 3,
+        "w": 4,
         "x": 0,
         "y": 4
       },
@@ -381,7 +451,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "auto"
       },
@@ -393,8 +463,10 @@
             "uid": "wFbInMnVk"
           },
           "editorMode": "code",
+          "exemplar": false,
           "expr": "SUM(increase(ks_blocks_mined{wallet=~\"${wallet_filter}\"}[${resolution}]))",
-          "legendFormat": "__auto",
+          "instant": false,
+          "legendFormat": "Blocks",
           "range": true,
           "refId": "A"
         }
@@ -429,7 +501,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 3,
+        "x": 4,
         "y": 4
       },
       "id": 29,
@@ -447,7 +519,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "auto"
       },
@@ -462,7 +534,7 @@
           "exemplar": false,
           "expr": "time() - max_over_time(timestamp(sum(changes(ks_blocks_mined{wallet=~\"${wallet_filter}\"}[5m]) > 0))[1d:1m]) + 300",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Elapsed time",
           "range": true,
           "refId": "A"
         }
@@ -497,7 +569,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 7,
+        "x": 8,
         "y": 4
       },
       "id": 43,
@@ -515,7 +587,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "auto"
       },
@@ -530,7 +602,7 @@
           "exemplar": false,
           "expr": "(sum(ks_estimated_network_hashrate_gauge) / (sum(rate(ks_valid_share_diff_counter{wallet=~\"${wallet_filter}\"}[${resolution}])) * 1e9)) / 60",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Block time",
           "range": true,
           "refId": "A"
         }
@@ -565,7 +637,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 11,
+        "x": 12,
         "y": 4
       },
       "id": 18,
@@ -583,7 +655,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "auto"
       },
@@ -598,7 +670,7 @@
           "exemplar": false,
           "expr": "ks_estimated_network_hashrate_gauge",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Nethash",
           "range": true,
           "refId": "A"
         }
@@ -634,7 +706,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 15,
+        "x": 16,
         "y": 4
       },
       "id": 21,
@@ -652,7 +724,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "value"
       },
@@ -667,7 +739,7 @@
           "exemplar": false,
           "expr": " avg(ks_network_difficulty_gauge) / 1000000000000",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Netdiff",
           "range": true,
           "refId": "A"
         }
@@ -676,7 +748,10 @@
       "type": "stat"
     },
     {
-      "datasource": {},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -697,8 +772,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 19,
+        "w": 4,
+        "x": 20,
         "y": 4
       },
       "id": 35,
@@ -715,7 +790,7 @@
           "values": false
         },
         "text": {
-          "valueSize": 64
+          "valueSize": 50
         },
         "textMode": "auto"
       },
@@ -730,7 +805,7 @@
           "exemplar": false,
           "expr": "MAX(ks_network_block_count)",
           "instant": true,
-          "legendFormat": "__auto",
+          "legendFormat": "Block Height",
           "range": false,
           "refId": "A"
         }
@@ -881,7 +956,6 @@
         "y": 8
       },
       "id": 41,
-      "interval": "1m",
       "maxDataPoints": 96,
       "options": {
         "legend": {
@@ -1615,7 +1689,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1730,7 +1805,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           }
@@ -1817,7 +1893,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1911,7 +1988,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -2067,7 +2145,7 @@
       {
         "current": {
           "selected": true,
-          "text": "show",
+          "text": "KAS",
           "value": "1"
         },
         "hide": 0,
@@ -2076,26 +2154,31 @@
         "name": "show_balances",
         "options": [
           {
+            "selected": false,
+            "text": "USD",
+            "value": "2"
+          },
+          {
             "selected": true,
-            "text": "show",
+            "text": "KAS",
             "value": "1"
           },
           {
             "selected": false,
-            "text": "hide",
+            "text": "Hide",
             "value": "0"
           }
         ],
-        "query": "1,0",
+        "query": "USD : 2, KAS : 1, Hide : 0",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
       },
       {
         "current": {
-          "selected": false,
-          "text": "kaspa:qzccsk5fwrh3c88460a0a99srnmhwf5gy49dk2e96935px29u5uks92guhf98",
-          "value": "kaspa:qzccsk5fwrh3c88460a0a99srnmhwf5gy49dk2e96935px29u5uks92guhf98"
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
@@ -2153,6 +2236,6 @@
   "timezone": "",
   "title": "KSB Monitoring",
   "uid": "x7cE7G74k",
-  "version": 44,
+  "version": 62,
   "weekStart": ""
 }
