@@ -15,9 +15,9 @@ kaspad_address: localhost:16110
 # accurate hashrate measurements
 # min_share_diff: 4
 
-# block_wait_time: time in ms to wait since last new block message from kaspad 
-# before manually requesting a new block
-# block_wait_time: 500
+# block_wait_time: time to wait since last new block message from kaspad before
+# manually requesting a new block
+# block_wait_time: 500ms
 
 # extranonce_size: size in bytes of extranonce, from 0 (no extranonce) to 3. 
 # With no extranonce (0), all clients will search through the same nonce-space,

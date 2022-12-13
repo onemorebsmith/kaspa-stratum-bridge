@@ -5,7 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"strconv"
+	"time"
 
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
@@ -14,17 +14,18 @@ import (
 )
 
 const version = "v1.1.6"
+const minBlockWaitTime = time.Duration(500) * time.Millisecond
 
 type BridgeConfig struct {
-	StratumPort     string `yaml:"stratum_port"`
-	RPCServer       string `yaml:"kaspad_address"`
-	PromPort        string `yaml:"prom_port"`
-	PrintStats      bool   `yaml:"print_stats"`
-	UseLogFile      bool   `yaml:"log_to_file"`
-	HealthCheckPort string `yaml:"health_check_port"`
-	BlockWaitTime   string `yaml:"block_wait_time"`
-	MinShareDiff    string `yaml:"min_share_diff"`
-	ExtranonceSize  string `yaml:"extranonce_size"`
+	StratumPort     string        `yaml:"stratum_port"`
+	RPCServer       string        `yaml:"kaspad_address"`
+	PromPort        string        `yaml:"prom_port"`
+	PrintStats      bool          `yaml:"print_stats"`
+	UseLogFile      bool          `yaml:"log_to_file"`
+	HealthCheckPort string        `yaml:"health_check_port"`
+	BlockWaitTime   time.Duration `yaml:"block_wait_time"`
+	MinShareDiff    uint          `yaml:"min_share_diff"`
+	ExtranonceSize  uint          `yaml:"extranonce_size"`
 }
 
 func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
@@ -58,7 +59,11 @@ func ListenAndServe(cfg BridgeConfig) error {
 		StartPromServer(logger, cfg.PromPort)
 	}
 
-	ksApi, err := NewKaspaAPI(cfg.RPCServer, cfg.BlockWaitTime, logger)
+	blockWaitTime := cfg.BlockWaitTime
+	if blockWaitTime < minBlockWaitTime {
+		blockWaitTime = minBlockWaitTime
+	}
+	ksApi, err := NewKaspaAPI(cfg.RPCServer, blockWaitTime, logger)
 	if err != nil {
 		return err
 	}
@@ -72,15 +77,15 @@ func ListenAndServe(cfg BridgeConfig) error {
 	}
 
 	shareHandler := newShareHandler(ksApi.kaspad)
-	minDiff, err := strconv.ParseFloat(cfg.MinShareDiff, 64)
-	if err != nil {
-		minDiff = 4
+	minDiff := cfg.MinShareDiff
+	if minDiff < 1 {
+		minDiff = 1
 	}
-	extranonceSize, err := strconv.ParseInt(cfg.ExtranonceSize, 10, 8)
-	if err != nil {
-		extranonceSize = 0
+	extranonceSize := cfg.ExtranonceSize
+	if extranonceSize > 3 {
+		extranonceSize = 3
 	}
-	clientHandler := newClientListener(logger, shareHandler, minDiff, int8(extranonceSize))
+	clientHandler := newClientListener(logger, shareHandler, float64(minDiff), int8(extranonceSize))
 	handlers := gostratum.DefaultHandlers()
 	// override the submit handler with an actual useful handler
 	handlers[string(gostratum.StratumMethodSubmit)] =
