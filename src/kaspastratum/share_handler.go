@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
@@ -17,12 +16,15 @@ import (
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/pkg/errors"
+	"go.uber.org/atomic"
 )
 
 type WorkStats struct {
-	SharesFound   int64
-	StaleShares   int64
-	InvalidShares int64
+	BlocksFound   atomic.Int64
+	SharesFound   atomic.Int64
+	SharesDiff    atomic.Float64
+	StaleShares   atomic.Int64
+	InvalidShares atomic.Int64
 	WorkerName    string
 	StartTime     time.Time
 	LastShare     time.Time
@@ -67,6 +69,10 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 		stats.WorkerName = ctx.RemoteAddr
 		stats.StartTime = time.Now()
 		sh.stats[ctx.RemoteAddr] = stats
+
+    // TODO: not sure this is the best place, nor whether we shouldn't be 
+    // resetting on disconnect
+    InitWorkerCounters(ctx)
 	}
 
 	sh.statsLock.Unlock()
@@ -142,8 +148,18 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		return err
 	}
 
+	// add extranonce to noncestr if enabled and submitted nonce is shorter than
+	// expected (16 - <extranonce length> characters)
+	if (ctx.Extranonce != "") {
+		extranonce2Len := 16 - len(ctx.Extranonce)
+		if (len(submitInfo.noncestr) <= extranonce2Len) {
+			submitInfo.noncestr = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.noncestr)
+		}
+	}
+
 	ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
-	if GetMiningState(ctx).useBigJob {
+	state := GetMiningState(ctx)
+	if state.useBigJob {
 		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
 		if err != nil {
 			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
@@ -185,18 +201,22 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
-		return sh.submit(ctx, converted, submitInfo.nonceVal, event.Id)
+		if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
+			return err
+		}
 	}
 	// remove for now until I can figure it out. No harm here as we're not
-	// } else if powValue.Cmp(fixedDifficultyBI) >= 0 {
+	// } else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
 	// 	ctx.Logger.Warn("weak block")
 	// 	RecordWeakShare(ctx)
 	// 	return ctx.ReplyLowDiffShare(event.Id)
 	// }
 
-	atomic.AddInt64(&stats.SharesFound, 1)
+	stats.SharesFound.Add(1)
+	stats.SharesDiff.Add(state.stratumDiff.hashValue)
 	stats.LastShare = time.Now()
-	RecordShareFound(ctx)
+	sh.overall.SharesFound.Add(1)
+	RecordShareFound(ctx, state.stratumDiff.hashValue)
 
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Id:     event.Id,
@@ -222,14 +242,14 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 		if strings.Contains(err.Error(), "ErrDuplicateBlock") {
 			ctx.Logger.Warn("block rejected, stale")
 			// stale
-			atomic.AddInt64(&sh.getCreateStats(ctx).StaleShares, 1)
-			atomic.AddInt64(&sh.overall.StaleShares, 1)
+			sh.getCreateStats(ctx).StaleShares.Add(1)
+			sh.overall.StaleShares.Add(1)
 			RecordStaleShare(ctx)
 			return ctx.ReplyStaleShare(eventId)
 		} else {
 			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow", err.Error())
-			atomic.AddInt64(&sh.getCreateStats(ctx).InvalidShares, 1)
-			atomic.AddInt64(&sh.overall.InvalidShares, 1)
+			sh.getCreateStats(ctx).InvalidShares.Add(1)
+			sh.overall.InvalidShares.Add(1)
 			RecordInvalidShare(ctx)
 			return ctx.ReplyBadShare(eventId)
 		}
@@ -238,13 +258,13 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	// :)
 	ctx.Logger.Info(fmt.Sprintf("block accepted %s", blockhash))
 	stats := sh.getCreateStats(ctx)
-	stats.LastShare = time.Now()
-	atomic.AddInt64(&stats.SharesFound, 1)
-	atomic.AddInt64(&sh.overall.SharesFound, 1)
+	stats.BlocksFound.Add(1)
+	sh.overall.BlocksFound.Add(1)
 	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore(), blockhash.String())
-	return ctx.Reply(gostratum.JsonRpcResponse{
-		Result: true,
-	})
+
+	// nil return allows HandleSubmit to record share (blocks are shares too!) and
+	// handle the response to the client
+	return nil
 }
 
 func (sh *shareHandler) startStatsThread() error {
@@ -253,31 +273,32 @@ func (sh *shareHandler) startStatsThread() error {
 		// console formatting is terrible. Good luck whever touches anything
 		time.Sleep(10 * time.Second)
 		sh.statsLock.Lock()
-		str := "\n=============================================================\n"
-		str += "  worker name   |  avg hashrate  |   acc/stl/inv  |   uptime \n"
-		str += "-------------------------------------------------------------\n"
+		str := "\n===============================================================================\n"
+		str += "  worker name   |  avg hashrate  |   acc/stl/inv  |    blocks    |    uptime   \n"
+		str += "-------------------------------------------------------------------------------\n"
 		var lines []string
 		totalRate := float64(0)
 		for _, v := range sh.stats {
-			rate := GetAverageHashrateGHz(v)
+			rate := GetAverageHashrateGHs(v)
 			totalRate += rate
 			rateStr := fmt.Sprintf("%0.2fGH/s", rate) // todo, fix units
-			ratioStr := fmt.Sprintf("%d/%d/%d", v.SharesFound, v.StaleShares, v.InvalidShares)
-			lines = append(lines, fmt.Sprintf("%-16s| %14.14s | %14.14s | %8.8s",
-				v.WorkerName, rateStr, ratioStr, time.Since(v.StartTime).Round(time.Second)))
+			ratioStr := fmt.Sprintf("%d/%d/%d", v.SharesFound.Load(), v.StaleShares.Load(), v.InvalidShares.Load())
+			lines = append(lines, fmt.Sprintf(" %-15s| %14.14s | %14.14s | %12d | %11s",
+				v.WorkerName, rateStr, ratioStr, v.BlocksFound.Load(), time.Since(v.StartTime).Round(time.Second)))
 		}
 		sort.Strings(lines)
 		str += strings.Join(lines, "\n")
 		rateStr := fmt.Sprintf("%0.2fGH/s", totalRate) // todo, fix units
-		str += "\n-------------------------------------------------------------\n"
-		str += fmt.Sprintf("mined: %-5d    | %14.14s |                | %8.8s",
-			sh.overall.SharesFound, rateStr, time.Since(start).Round(time.Second))
-		str += "\n============================================= ks_bridge_" + version + "\n"
+		ratioStr := fmt.Sprintf("%d/%d/%d", sh.overall.SharesFound.Load(), sh.overall.StaleShares.Load(), sh.overall.InvalidShares.Load())
+		str += "\n-------------------------------------------------------------------------------\n"
+		str += fmt.Sprintf("                | %14.14s | %14.14s | %12d | %11s",
+			rateStr, ratioStr, sh.overall.BlocksFound.Load(), time.Since(start).Round(time.Second))
+		str += "\n========================================================== ks_bridge_" + version + " ===\n"
 		sh.statsLock.Unlock()
 		log.Println(str)
 	}
 }
 
-func GetAverageHashrateGHz(stats *WorkStats) float64 {
-	return (float64(stats.SharesFound) * shareValue) / time.Since(stats.StartTime).Seconds()
+func GetAverageHashrateGHs(stats *WorkStats) float64 {
+	return stats.SharesDiff.Load() / time.Since(stats.StartTime).Seconds()
 }

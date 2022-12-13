@@ -25,6 +25,7 @@ type StratumContext struct {
 	onDisconnect  chan *StratumContext
 	State         any // gross, but go generics aren't mature enough this can be typed 😭
 	writeLock     int32
+	Extranonce    string
 }
 
 var ErrorDisconnected = fmt.Errorf("disconnecting")

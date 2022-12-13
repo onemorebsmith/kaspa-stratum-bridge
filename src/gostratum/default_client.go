@@ -67,6 +67,11 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 		return errors.Wrap(err, "failed to send response to authorize")
 	}
 	ctx.Logger.Info("client authorized, address: ", ctx.WalletAddr)
+
+	if ctx.Extranonce != "" {
+		SendExtranonce(ctx)
+	}
+
 	return nil
 }
 
@@ -90,4 +95,11 @@ func HandleSubmit(ctx *StratumContext, event JsonRpcEvent) error {
 	// stub
 	ctx.Logger.Info("work submission")
 	return nil
+}
+
+func SendExtranonce(ctx *StratumContext) {
+	if err := ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce})); err != nil {
+		// should we doing anything further on failure
+		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))
+	}
 }

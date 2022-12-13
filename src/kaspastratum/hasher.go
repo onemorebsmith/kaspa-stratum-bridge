@@ -13,15 +13,46 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
-// Diff magic numbers:
-// these are a pair, if you change one you need to change the other
-const diffPower = 34
-const shareValue = float64(2<<(diffPower-1)) / float64(1000000000) // in GH/s
+// static value definitions to avoid overhead in diff translations
+var (
+	maxTarget = big.NewFloat(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+	minHash   = new(big.Float).Quo(new(big.Float).SetMantExp(big.NewFloat(1), 256), maxTarget)
+	bigGig    = big.NewFloat(1e9)
+)
 
-// 🤮 -- difficulty is a decreasing value, so the actual diff val is based on the inverse
-// of the power that we actually want. See the notes in kaspad, they're more coherent
-var fixedDifficultyBI = new(big.Int).Lsh(big.NewInt(1), 256-diffPower)
-var fixedDifficulty = BigDiffToLittle(fixedDifficultyBI)
+// Basically three different ways of representing difficulty, each used on
+// different occasions.  All 3 are updated when the stratum diff is set via 
+// the setDiffValue method
+type kaspaDiff struct {
+	hashValue   float64  // previously known as shareValue
+	diffValue   float64  // previously known as fixedDifficulty
+	targetValue *big.Int // previously know as fixedDifficultyBI
+}
+
+func newKaspaDiff() *kaspaDiff {
+	return &kaspaDiff{}
+}
+
+func (k *kaspaDiff) setDiffValue(diff float64) {
+	k.diffValue = diff
+	k.targetValue = DiffToTarget(diff)
+	k.hashValue = DiffToHash(diff)
+}
+
+func DiffToTarget(diff float64) *big.Int {
+	target := new(big.Float).Quo(maxTarget, big.NewFloat(diff))
+
+	t, _ := target.Int(nil)
+	return t
+}
+
+func DiffToHash(diff float64) float64 {
+	hashVal := new(big.Float).Mul(minHash, big.NewFloat(diff))
+	hashVal.Quo(hashVal, bigGig)
+
+	h, _ := hashVal.Float64()
+	return h
+}
 
 func SerializeBlockHeader(template *appmessage.RPCBlock) ([]byte, error) {
 	hasher, err := blake2b.New(32, []byte("BlockHash"))

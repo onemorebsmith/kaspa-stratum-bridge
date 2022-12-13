@@ -22,6 +22,11 @@ var shareCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Number of shares found by worker over time",
 }, workerLabels)
 
+var shareDiffCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "ks_valid_share_diff_counter",
+	Help: "Total difficulty of shares found by worker over time",
+}, workerLabels)
+
 var invalidCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "ks_invalid_share_counter",
 	Help: "Number of stale shares found by worker over time",
@@ -81,8 +86,9 @@ func commonLabels(worker *gostratum.StratumContext) prometheus.Labels {
 	}
 }
 
-func RecordShareFound(worker *gostratum.StratumContext) {
+func RecordShareFound(worker *gostratum.StratumContext, shareDiff float64) {
 	shareCounter.With(commonLabels(worker)).Inc()
+	shareDiffCounter.With(commonLabels(worker)).Add(shareDiff)
 }
 
 func RecordStaleShare(worker *gostratum.StratumContext) {
@@ -114,7 +120,7 @@ func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64,
 	labels := commonLabels(worker)
 	labels["nonce"] = fmt.Sprintf("%d", nonce)
 	labels["bluescore"] = fmt.Sprintf("%d", bluescore)
-	labels["hash"] = fmt.Sprintf("%d", bluescore)
+	labels["hash"] = fmt.Sprintf("%d", hash)
 	blockGauge.With(labels).Set(1)
 }
 
@@ -137,6 +143,30 @@ func RecordWorkerError(address string, shortError ErrorShortCodeT) {
 		"wallet": address,
 		"error":  string(shortError),
 	}).Inc()
+}
+
+func InitInvalidCounter(worker *gostratum.StratumContext, errorType string) {
+	labels := commonLabels(worker)
+	labels["type"] = errorType
+	invalidCounter.With(labels).Add(0)
+}
+
+func InitWorkerCounters(worker *gostratum.StratumContext) {
+  labels := commonLabels(worker)
+
+	shareCounter.With(labels).Add(0)
+	shareDiffCounter.With(labels).Add(0)
+
+  errTypes := []string{"stale", "duplicate", "invalid", "weak"}
+  for _, e := range errTypes {
+    InitInvalidCounter(worker, e)
+  }
+
+	blockCounter.With(labels).Add(0)
+
+	disconnectCounter.With(labels).Add(0)
+
+	jobCounter.With(labels).Add(0)
 }
 
 func RecordBalances(response *appmessage.GetBalancesByAddressesResponseMessage) {

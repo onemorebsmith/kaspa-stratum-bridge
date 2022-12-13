@@ -13,23 +13,25 @@ import (
 )
 
 type KaspaApi struct {
-	address   string
-	logger    *zap.SugaredLogger
-	kaspad    *rpcclient.RPCClient
-	connected bool
+	address       string
+	blockWaitTime time.Duration
+	logger        *zap.SugaredLogger
+	kaspad        *rpcclient.RPCClient
+	connected     bool
 }
 
-func NewKaspaAPI(address string, logger *zap.SugaredLogger) (*KaspaApi, error) {
+func NewKaspaAPI(address string, blockWaitTime time.Duration, logger *zap.SugaredLogger) (*KaspaApi, error) {
 	client, err := rpcclient.NewRPCClient(address)
 	if err != nil {
 		return nil, err
 	}
 
 	return &KaspaApi{
-		address:   address,
-		logger:    logger.With(zap.String("component", "kaspaapi:"+address)),
-		kaspad:    client,
-		connected: true,
+		address:       address,
+		blockWaitTime: blockWaitTime,
+		logger:        logger.With(zap.String("component", "kaspaapi:"+address)),
+		kaspad:        client,
+		connected:     true,
 	}, nil
 }
 
@@ -105,8 +107,7 @@ func (s *KaspaApi) startBlockTemplateListener(ctx context.Context, blockReadyCb 
 		s.logger.Error("fatal: failed to register for block notifications from kaspa")
 	}
 
-	const tickerTime = 500 * time.Millisecond
-	ticker := time.NewTicker(tickerTime)
+	ticker := time.NewTicker(s.blockWaitTime)
 	for {
 		if err := s.waitForSync(false); err != nil {
 			s.logger.Error("error checking kaspad sync state, attempting reconnect: ", err)
@@ -121,7 +122,7 @@ func (s *KaspaApi) startBlockTemplateListener(ctx context.Context, blockReadyCb 
 			return
 		case <-blockReadyChan:
 			blockReadyCb()
-			ticker.Reset(tickerTime)
+			ticker.Reset(s.blockWaitTime)
 		case <-ticker.C: // timeout, manually check for new blocks
 			blockReadyCb()
 		}

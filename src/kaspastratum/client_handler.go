@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"math"
 
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/pkg/errors"
@@ -24,24 +25,47 @@ type clientListener struct {
 	clients          map[int32]*gostratum.StratumContext
 	lastBalanceCheck time.Time
 	clientCounter    int32
+	minShareDiff     float64
+	extranonceSize   int8
+	maxExtranonce    int32
+	nextExtranonce   int32
 }
 
-func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler) *clientListener {
+func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
 	return &clientListener{
-		logger:       logger,
-		clientLock:   sync.RWMutex{},
-		shareHandler: shareHandler,
-		clients:      make(map[int32]*gostratum.StratumContext),
+		logger:         logger,
+		minShareDiff:   minShareDiff,
+		extranonceSize: extranonceSize,
+		maxExtranonce:  int32(math.Pow(2, (8 * math.Min(float64(extranonceSize), 3))) - 1),
+		nextExtranonce: 0,
+		clientLock:     sync.RWMutex{},
+		shareHandler:   shareHandler,
+		clients:        make(map[int32]*gostratum.StratumContext),
 	}
 }
 
 func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
+	var extranonce int32
+
 	idx := atomic.AddInt32(&c.clientCounter, 1)
 	ctx.Id = idx
 	c.clientLock.Lock()
+	if c.extranonceSize > 0 {
+		extranonce = c.nextExtranonce
+		if c.nextExtranonce < c.maxExtranonce {
+			c.nextExtranonce++
+		} else {
+			c.nextExtranonce = 0
+			c.logger.Warn("wrapped extranonce! new clients may be duplicating work...")
+		}
+	}
 	c.clients[idx] = ctx
 	c.clientLock.Unlock()
 	ctx.Logger = ctx.Logger.With(zap.Int("client_id", int(ctx.Id)))
+
+	if c.extranonceSize > 0 {
+		ctx.Extranonce = fmt.Sprintf("%0*x", c.extranonceSize * 2, extranonce)
+	}
 	go func() {
 		// hacky, but give time for the authorize to go through so we can use the worker name
 		time.Sleep(5 * time.Second)
@@ -62,8 +86,8 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
-	for _, c := range c.clients {
-		if !c.Connected() {
+	for _, cl := range c.clients {
+		if !cl.Connected() {
 			continue
 		}
 		go func(client *gostratum.StratumContext) {
@@ -102,10 +126,12 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 				state.initialized = true
 				state.useBigJob = bigJobRegex.MatchString(client.RemoteApp)
 				// first pass through send the difficulty since it's fixed
+				state.stratumDiff = newKaspaDiff()
+				state.stratumDiff.setDiffValue(c.minShareDiff)
 				if err := client.Send(gostratum.JsonRpcEvent{
 					Version: "2.0",
 					Method:  "mining.set_difficulty",
-					Params:  []any{fixedDifficulty},
+					Params:  []any{state.stratumDiff.diffValue},
 				}); err != nil {
 					RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
 					client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
@@ -137,10 +163,10 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			}
 
 			RecordNewJob(client)
-		}(c)
+		}(cl)
 
-		if c.WalletAddr != "" {
-			addresses = append(addresses, c.WalletAddr)
+		if cl.WalletAddr != "" {
+			addresses = append(addresses, cl.WalletAddr)
 		}
 	}
 	c.clientLock.Unlock()

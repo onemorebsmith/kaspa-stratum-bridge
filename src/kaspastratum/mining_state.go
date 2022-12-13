@@ -19,6 +19,7 @@ type MiningState struct {
 	initialized bool
 	useBigJob   bool
 	connectTime time.Time
+	stratumDiff *kaspaDiff
 }
 
 func MiningStateGenerator() any {
