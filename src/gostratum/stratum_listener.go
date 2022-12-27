@@ -2,6 +2,7 @@ package gostratum
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -26,7 +27,7 @@ type StratumStats struct {
 }
 
 type StratumListenerConfig struct {
-	Logger         *zap.SugaredLogger
+	Logger         *zap.Logger
 	HandlerMap     StratumHandlerMap
 	ClientListener StratumClientListener
 	StateGenerator StateGenerator
@@ -64,7 +65,7 @@ func NewListener(cfg StratumListenerConfig) *StratumListener {
 func (s *StratumListener) Listen(ctx context.Context) error {
 	s.shuttingDown = false
 
-	serverContext, cancel := context.WithCancel(context.Background())
+	serverContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	lc := net.ListenConfig{}
@@ -92,15 +93,15 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 		addr = parts[0] // trim off the port
 	}
 	clientContext := &StratumContext{
-		ctx:          ctx,
-		RemoteAddr:   addr,
-		Logger:       s.Logger.With(zap.String("client", addr)),
-		connection:   connection,
-		State:        s.StateGenerator(),
-		onDisconnect: s.disconnectChannel,
+		parentContext: ctx,
+		RemoteAddr:    addr,
+		Logger:        s.Logger.With(zap.String("client", addr)),
+		connection:    connection,
+		State:         s.StateGenerator(),
+		onDisconnect:  s.disconnectChannel,
 	}
 
-	s.Logger.Info("new client connecting - ", addr)
+	s.Logger.Info(fmt.Sprintf("new client connecting - %s", addr))
 
 	if s.ClientListener != nil { // TODO: should this be before we spawn the handler?
 		s.ClientListener.OnConnect(clientContext)
@@ -126,7 +127,7 @@ func (s *StratumListener) disconnectListener(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case client := <-s.disconnectChannel:
-			s.Logger.Info("client disconnecting - ", client.RemoteAddr)
+			s.Logger.Info(fmt.Sprintf("client disconnecting - %s", client.RemoteAddr))
 			s.stats.Disconnects++
 			if s.ClientListener != nil {
 				s.ClientListener.OnDisconnect(client)
