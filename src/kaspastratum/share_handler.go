@@ -17,6 +17,7 @@ import (
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
+	"go.uber.org/zap"
 )
 
 type WorkStats struct {
@@ -70,9 +71,9 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 		stats.StartTime = time.Now()
 		sh.stats[ctx.RemoteAddr] = stats
 
-    // TODO: not sure this is the best place, nor whether we shouldn't be 
-    // resetting on disconnect
-    InitWorkerCounters(ctx)
+		// TODO: not sure this is the best place, nor whether we shouldn't be
+		// resetting on disconnect
+		InitWorkerCounters(ctx)
 	}
 
 	sh.statsLock.Unlock()
@@ -150,14 +151,14 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 	// add extranonce to noncestr if enabled and submitted nonce is shorter than
 	// expected (16 - <extranonce length> characters)
-	if (ctx.Extranonce != "") {
+	if ctx.Extranonce != "" {
 		extranonce2Len := 16 - len(ctx.Extranonce)
-		if (len(submitInfo.noncestr) <= extranonce2Len) {
+		if len(submitInfo.noncestr) <= extranonce2Len {
 			submitInfo.noncestr = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.noncestr)
 		}
 	}
 
-	ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
+	//ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
 	state := GetMiningState(ctx)
 	if state.useBigJob {
 		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
@@ -247,7 +248,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 			RecordStaleShare(ctx)
 			return ctx.ReplyStaleShare(eventId)
 		} else {
-			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow", err.Error())
+			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow", zap.Error(err))
 			sh.getCreateStats(ctx).InvalidShares.Add(1)
 			sh.overall.InvalidShares.Add(1)
 			RecordInvalidShare(ctx)

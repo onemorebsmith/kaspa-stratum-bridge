@@ -14,7 +14,7 @@ import (
 )
 
 const version = "v1.1.6"
-const minBlockWaitTime = time.Duration(500) * time.Millisecond
+const minBlockWaitTime = 500 * time.Millisecond
 
 type BridgeConfig struct {
 	StratumPort     string        `yaml:"stratum_port"`
@@ -91,7 +91,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 	handlers[string(gostratum.StratumMethodSubmit)] =
 		func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
 			if err := shareHandler.HandleSubmit(ctx, event); err != nil {
-				ctx.Logger.Error(err) // sink error
+				ctx.Logger.Sugar().Error(err) // sink error
 			}
 			return nil
 		}
@@ -101,7 +101,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 		HandlerMap:     handlers,
 		StateGenerator: MiningStateGenerator,
 		ClientListener: clientHandler,
-		Logger:         logger,
+		Logger:         logger.Desugar(),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

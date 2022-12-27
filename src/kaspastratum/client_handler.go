@@ -2,12 +2,12 @@ package kaspastratum
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"math"
 
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
 	"github.com/pkg/errors"
@@ -36,7 +36,7 @@ func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler, mi
 		logger:         logger,
 		minShareDiff:   minShareDiff,
 		extranonceSize: extranonceSize,
-		maxExtranonce:  int32(math.Pow(2, (8 * math.Min(float64(extranonceSize), 3))) - 1),
+		maxExtranonce:  int32(math.Pow(2, (8*math.Min(float64(extranonceSize), 3))) - 1),
 		nextExtranonce: 0,
 		clientLock:     sync.RWMutex{},
 		shareHandler:   shareHandler,
@@ -64,7 +64,7 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 	ctx.Logger = ctx.Logger.With(zap.Int("client_id", int(ctx.Id)))
 
 	if c.extranonceSize > 0 {
-		ctx.Extranonce = fmt.Sprintf("%0*x", c.extranonceSize * 2, extranonce)
+		ctx.Extranonce = fmt.Sprintf("%0*x", c.extranonceSize*2, extranonce)
 	}
 	go func() {
 		// hacky, but give time for the authorize to go through so we can use the worker name
@@ -95,7 +95,7 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			if client.WalletAddr == "" {
 				if time.Since(state.connectTime) > time.Second*20 { // timeout passed
 					// this happens pretty frequently in gcp/aws land since script-kiddies scrape ports
-					client.Logger.Warn("client misconfigured, no miner address specified - disconnecting", client.String())
+					client.Logger.Warn("client misconfigured, no miner address specified - disconnecting", zap.String("client", client.String()))
 					RecordWorkerError(client.WalletAddr, ErrNoMinerAddress)
 					client.Disconnect() // invalid configuration, boot the worker
 				}
