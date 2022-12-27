@@ -19,6 +19,7 @@ func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumLis
 		err := readFromConnection(connection, func(line string) error {
 			event, err := UnmarshalEvent(line)
 			if err != nil {
+				ctx.Logger.Error("error unmarshalling event", zap.String("raw", line))
 				return err
 			}
 			return s.HandleEvent(ctx, event)
@@ -28,6 +29,9 @@ func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumLis
 		}
 		if ctx.Err() != nil {
 			return ctx.Err() // context cancelled
+		}
+		if ctx.parentContext.Err() != nil {
+			return ctx.parentContext.Err() // parent context cancelled
 		}
 		if err != nil { // actual error
 			ctx.Logger.Error("error reading from socket", zap.Error(err))

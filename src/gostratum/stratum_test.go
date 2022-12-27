@@ -12,14 +12,14 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func testLogger() *zap.SugaredLogger {
+func testLogger() *zap.Logger {
 	cfg := zap.NewDevelopmentEncoderConfig()
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	return zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),
 		zapcore.AddSync(colorable.NewColorableStdout()),
 		zapcore.DebugLevel,
-	)).Sugar()
+	))
 }
 
 func TestAcceptContextLifetime(t *testing.T) {

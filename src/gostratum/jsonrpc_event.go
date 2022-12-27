@@ -46,3 +46,11 @@ func UnmarshalEvent(in string) (JsonRpcEvent, error) {
 	}
 	return event, nil
 }
+
+func UnmarshalResponse(in string) (JsonRpcResponse, error) {
+	resp := JsonRpcResponse{}
+	if err := json.Unmarshal([]byte(in), &resp); err != nil {
+		return JsonRpcResponse{}, err
+	}
+	return resp, nil
+}

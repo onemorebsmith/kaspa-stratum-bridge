@@ -8,30 +8,60 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 type StratumContext struct {
-	ctx           context.Context
+	parentContext context.Context
 	RemoteAddr    string
 	WalletAddr    string
 	WorkerName    string
 	RemoteApp     string
 	Id            int32
-	Logger        *zap.SugaredLogger
+	Logger        *zap.Logger
 	connection    net.Conn
 	disconnecting bool
 	onDisconnect  chan *StratumContext
 	State         any // gross, but go generics aren't mature enough this can be typed 😭
 	writeLock     int32
-	Extranonce    string
+}
+
+type ContextSummary struct {
+	RemoteAddr string
+	WalletAddr string
+	WorkerName string
+	RemoteApp  string
 }
 
 var ErrorDisconnected = fmt.Errorf("disconnecting")
 
 func (sc *StratumContext) Connected() bool {
 	return !sc.disconnecting
+}
+
+func (sc *StratumContext) Summary() ContextSummary {
+	return ContextSummary{
+		RemoteAddr: sc.RemoteAddr,
+		WalletAddr: sc.WalletAddr,
+		WorkerName: sc.WorkerName,
+		RemoteApp:  sc.RemoteApp,
+	}
+}
+
+func NewMockContext(ctx context.Context, logger *zap.Logger, state any) (*StratumContext, *MockConnection) {
+	mc := NewMockConnection()
+	return &StratumContext{
+		parentContext: ctx,
+		State:         state,
+		RemoteAddr:    "127.0.0.1",
+		WalletAddr:    uuid.NewString(),
+		WorkerName:    uuid.NewString(),
+		RemoteApp:     "mock.context",
+		Logger:        logger,
+		connection:    mc,
+	}, mc
 }
 
 func (sc *StratumContext) String() string {
@@ -161,5 +191,5 @@ func (StratumContext) Err() error {
 }
 
 func (d StratumContext) Value(key any) any {
-	return d.ctx.Value(key)
+	return d.parentContext.Value(key)
 }

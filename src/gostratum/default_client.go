@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/mattn/go-colorable"
+	"github.com/onemorebsmith/kaspa-pool/src/model"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -18,17 +19,17 @@ const (
 	StratumMethodSubmit    StratumMethod = "mining.submit"
 )
 
-func DefaultLogger() *zap.SugaredLogger {
+func DefaultLogger() *zap.Logger {
 	cfg := zap.NewDevelopmentEncoderConfig()
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	return zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),
 		zapcore.AddSync(colorable.NewColorableStdout()),
 		zapcore.DebugLevel,
-	)).Sugar()
+	))
 }
 
-func DefaultConfig(logger *zap.SugaredLogger) StratumListenerConfig {
+func DefaultConfig(logger *zap.Logger) StratumListenerConfig {
 	return StratumListenerConfig{
 		StateGenerator: func() any { return nil },
 		HandlerMap:     DefaultHandlers(),
@@ -59,6 +60,12 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 		address = parts[0]
 		workerName = parts[1]
 	}
+	var err error
+	address, err = model.CleanWallet(address)
+	if err != nil {
+		return fmt.Errorf("invalid wallet format %s: %w", address, err)
+	}
+
 	ctx.WalletAddr = address
 	ctx.WorkerName = workerName
 	ctx.Logger = ctx.Logger.With(zap.String("worker", ctx.WorkerName), zap.String("addr", ctx.WalletAddr))
@@ -66,12 +73,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	if err := ctx.Reply(NewResponse(event, true, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to authorize")
 	}
-	ctx.Logger.Info("client authorized, address: ", ctx.WalletAddr)
-
-	if ctx.Extranonce != "" {
-		SendExtranonce(ctx)
-	}
-
+	ctx.Logger.Info(fmt.Sprintf("client authorized, address: %s", ctx.WalletAddr))
 	return nil
 }
 
@@ -95,11 +97,4 @@ func HandleSubmit(ctx *StratumContext, event JsonRpcEvent) error {
 	// stub
 	ctx.Logger.Info("work submission")
 	return nil
-}
-
-func SendExtranonce(ctx *StratumContext) {
-	if err := ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce})); err != nil {
-		// should we doing anything further on failure
-		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))
-	}
 }
