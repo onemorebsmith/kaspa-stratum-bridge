@@ -2,10 +2,11 @@ package gostratum
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
+	"github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
-	"github.com/onemorebsmith/kaspa-pool/src/model"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -61,7 +62,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 		workerName = parts[1]
 	}
 	var err error
-	address, err = model.CleanWallet(address)
+	address, err = CleanWallet(address)
 	if err != nil {
 		return fmt.Errorf("invalid wallet format %s: %w", address, err)
 	}
@@ -108,4 +109,22 @@ func SendExtranonce(ctx *StratumContext) {
 		// should we doing anything further on failure
 		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))
 	}
+}
+
+var walletRegex = regexp.MustCompile("kaspa:[a-z0-9]+")
+
+func CleanWallet(in string) (string, error) {
+	_, err := util.DecodeAddress(in, util.Bech32PrefixKaspa)
+	if err == nil {
+		return in, nil // good to go
+	}
+	if !strings.HasPrefix(in, "kaspa:") {
+		return CleanWallet("kaspa:" + in)
+	}
+
+	// has kaspa: prefix but other weirdness somewhere
+	if walletRegex.MatchString(in) {
+		return in[0:67], nil
+	}
+	return "", errors.New("unable to coerce wallet to valid kaspa address")
 }

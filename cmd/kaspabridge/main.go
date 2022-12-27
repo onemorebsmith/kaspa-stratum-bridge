@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"time"
 
 	"github.com/onemorebsmith/kaspastratum/src/kaspastratum"
 	"gopkg.in/yaml.v2"
@@ -36,6 +37,13 @@ func main() {
 	flag.BoolVar(&cfg.UseLogFile, "log", cfg.UseLogFile, "if true will output errors to log file, default `true`")
 	flag.StringVar(&cfg.HealthCheckPort, "hcp", cfg.HealthCheckPort, `(rarely used) if defined will expose a health check on /readyz, default ""`)
 	flag.Parse()
+
+	if cfg.MinShareDiff == 0 {
+		cfg.MinShareDiff = 4
+	}
+	if cfg.BlockWaitTime == 0 {
+		cfg.BlockWaitTime = 5 * time.Second // this should never happen due to kas 1s block times
+	}
 
 	log.Println("----------------------------------")
 	log.Printf("initializing bridge")
