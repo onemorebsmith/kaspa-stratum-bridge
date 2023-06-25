@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var bigJobRegex = regexp.MustCompile(".*BzMiner.*")
+var bigJobRegex = regexp.MustCompile(".*(BzMiner|IceRiverMiner).*")
 
 const balanceDelay = time.Minute
 
