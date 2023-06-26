@@ -81,16 +81,16 @@ Note: This requires that docker is installed.
 [^1]: This command builds the bridge component from source, rather than the previous behavior of pulling down a pre-built image.  You may still use the pre-built image by replacing 'docker-compose-all-src.yml' with 'docker-compose-all.yml', but it is not guaranteed to be up to date, so compiling from source is the better alternative.
   
 
-This also spins up a local prometheus and grafana instance that gather stats and host the metrics dashboard. Once the services are up and running you can view the dashboard using `http://127.0.0.1:3000/d/x7cE7G74k/monitoring`
+This also spins up a local prometheus and grafana instance that gather stats and host the metrics dashboard. Once the services are up and running you can view the dashboard using `http://127.0.0.1:3000/d/x7cE7G74k1/ksb-monitoring`
 
 Default grafana user/pass: admin/admin
 
-Most of the stats on the graph are averaged over an hour time period, so keep in mind that the metrics might be inaccurate for the first hour or so that the bridge is up.
+Many of the stats on the graph are averaged over a configurable time period (24hr default - use the 'resolution' dropdown to change this), so keep in mind that the metrics might be incomplete during this initial period.
 
 
 ## Docker (non-compose)
 
-Note: This does not require pulling down the repo, it only requires that docker is installed.
+Note: This does not require pulling down the repo, it only requires that docker is installed.  However, as this relies on a prebuilt image from a repository, it may not always be up to date with the latest source.
 
 `docker run -p 5555:5555 onemorebsmith/kaspa_bridge:latest --log=false` will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections.
 
