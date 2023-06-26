@@ -76,7 +76,7 @@ Note: This requires that docker is installed.
 
   
 
-`docker compose -f docker-compose-all-src.yml up -d` [^1] will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections.
+`docker compose -f docker-compose-all-src.yml up -d` [^1] will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections. (Use `docker compose -f docker-compose-all-src.yml up -d --build ks_bridge` to ensure the bridge component is rebuilt after pulling down updates from github.)
 
 [^1]: This command builds the bridge component from source, rather than the previous behavior of pulling down a pre-built image.  You may still use the pre-built image by replacing 'docker-compose-all-src.yml' with 'docker-compose-all.yml', but it is not guaranteed to be up to date, so compiling from source is the better alternative.
   
