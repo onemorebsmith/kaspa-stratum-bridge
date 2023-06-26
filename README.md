@@ -72,12 +72,13 @@ ks_worker_job_counter{ip="192.168.0.65",miner="BzMiner-v11.1.0",wallet="kaspa:qz
 
 ## Docker All-in-one
 
-Note: This does requires that docker is installed.
+Note: This requires that docker is installed.
 
   
 
-`docker compose -f docker-compose-all.yml up -d` will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections.
+`docker compose -f docker-compose-all-src.yml up -d` [^1] will run the bridge with default settings. This assumes a local kaspad node with default port settings and exposes port 5555 to incoming stratum connections.
 
+[^1]: This command builds the bridge component from source, rather than the previous behavior of pulling down a pre-built image.  You may still use the pre-built image by replacing 'docker-compose-all-src.yml' with 'docker-compose-all.yml', but it is not guaranteed to be up to date, so compiling from source is the better alternative.
   
 
 This also spins up a local prometheus and grafana instance that gather stats and host the metrics dashboard. Once the services are up and running you can view the dashboard using `http://127.0.0.1:3000/d/x7cE7G74k/monitoring`
@@ -119,3 +120,5 @@ run `./kaspabridge` in the `cmd/kaspabridge` directory
   
 
 all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
+
+
