@@ -15,7 +15,10 @@ Discord discussions/issues: [here](https://discord.com/channels/5991532306598461
 
 Huge shoutout to https://github.com/KaffinPX/KStratum for the inspiration
   
-Tips appreciated: `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp`
+Tips appreciated: 
+- [@onemorebsmith](https://github.com/onemorebsmith): `kaspa:qp9v6090sr8jjlkq7r3f4h9un5rtfhu3raknfg3cca9eapzee57jzew0kxwlp`
+- [@rdugan](https://github.com/rdugan): `kaspa:qrkhyhej7h0gmmvsuf8mmufget4n4xnlwx5j360sz70q7xvu0hlaxfmt9p8j8`
+
 
 # Features:
 
