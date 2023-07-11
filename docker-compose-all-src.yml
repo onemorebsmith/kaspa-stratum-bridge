@@ -2,7 +2,9 @@ volumes:
   prometheus_data: {}
 services:
   ks_bridge:
-    build: .
+    build:
+      context: .
+      no_cache: true
     container_name: ks_bridge
     restart: unless-stopped
     user: "0"

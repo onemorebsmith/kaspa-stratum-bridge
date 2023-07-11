@@ -1,4 +1,5 @@
-# stratum_listen_port: the port that will be listening for incoming stratum traffic
+# stratum_listen_port: the port that will be listening for incoming stratum 
+# traffic
 # Note `:PORT` format is needed if not specifiying a specific ip range 
 stratum_port: :5555
 
@@ -8,11 +9,11 @@ stratum_port: :5555
 # kaspad_address: 46.17.104.200:16110
 kaspad_address: localhost:16110
 
-# min_share_diff: only accept shares of the specified difficulty (or higher) from 
-# the miner(s).  Higher values will reduce the number of shares submitted, thereby 
-# reducing network traffic and server load, while lower values will increase the
-# number of shares submitted, thereby reducing the amount of time needed for 
-# accurate hashrate measurements
+# min_share_diff: only accept shares of the specified difficulty (or higher) 
+# from the miner(s).  Higher values will reduce the number of shares submitted, 
+# thereby reducing network traffic and server load, while lower values will 
+# increase the number of shares submitted, thereby reducing the amount of time 
+# needed for accurate hashrate measurements
 # min_share_diff: 4
 
 # block_wait_time: time to wait since last new block message from kaspad before
@@ -36,7 +37,7 @@ print_stats: true
 # log_to_file: if true logs will be written to a file local to the executable
 log_to_file: true
 
-# prom_port: if this is specified prometheus will serve stats on the port provided
+# prom_port: if specified, prometheus will serve stats on the port provided
 # see readme for summary on how to get prom up and running using docker
 # you can get the raw metrics (along with default golang metrics) using
 # `curl http://localhost:{prom_port}/metrics`

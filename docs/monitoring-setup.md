@@ -1,6 +1,4 @@
-# Configuring monitoring (Grafana + Prom)
-
-Easiest setup, [join my 0-fee solo pool](http://grafana.ghost-pool.io/d/x7cE7G74k/pool-monitoring?orgId=1&refresh=5s)
+# Configuring monitoring (Grafana + Prometheus)
 
 ## Reqirements
 
@@ -23,7 +21,7 @@ At this point if you can not progress without docker installed. Go install it if
 
 For this example I'll be running everything in docker -- including the bridge. So type the following from the root folder to stand up everything:
 
-`docker compose -f docker-compose-all.yml up -d`
+`docker compose -f docker-compose-all-src.yml up -d --build`
 
 Youll see output about downloading images and such and eventually see output like below: 
 
@@ -39,20 +37,16 @@ You may point your miners the IP address of the computer you installed on at por
 
 ## Accessing grafana
 
-Assuming the setup went correctly you'll be able to access grafana by visiting http://127.0.0.1:3000
+Assuming the setup went correctly you'll be able to access grafana by visiting <http://127.0.0.1:3000/d/x7cE7G74k1/ksb-monitoring>
 
 ![image](https://user-images.githubusercontent.com/59971111/192024515-dd487a3a-3d15-4d21-bfbf-189b2db69782.png)
 
 The default user/password is admin/admin. Grafana will prompt you to change the password but you can just ignore it (hit skip).
 
-You'll land on the main grafana page. There's a lot you can do here but for now just click the pre-made dashboard:
+You will then be redirected to the mining dashboard. It'll look like below until you start getting info from your miners. 
 
-![image](https://user-images.githubusercontent.com/59971111/192024840-f8ebd4b0-dda0-4249-b4da-3a971baf9836.png)
+![Monitoring Dashboard Without Data](/docs/images/dashboard_no_data.png)
 
-This will drop you to the mining dashboard. It'll look like below until you start getting info from your miners. 
-
-![image](https://user-images.githubusercontent.com/59971111/192024903-ed629405-ac6f-4263-8005-8863399d227a.png)
-
-At this point you're configured and good to go. Things to note here are that the stats will be inaccurate for the first hour or so that the bridge is running as most of the stats are based on 10-30m averages. Also note that there is a 'wallet_filter' and 'show_balances' toggle near the top of the screen. These filter the database and hide your balance if you don't want that exposed. The monitoring UI is also accessable on any device on your local network (including your phone!) if you use the host computers ip address -- just type in the ip and port such as `http://192.168.0.25/3000` (this is an example, this exact link probablly wont work for you)
+At this point you're configured and good to go. Many of the stats on the graph are averaged over a configurable time period (24hr default - use the 'resolution' dropdown on the top left of the page to change this), so keep in mind that the metrics might be incomplete during this initial period. Also note that there are 'wallet_filter' and 'show_balances' dropdowns as well. These filter the database and hide your balance if you don't want that exposed. The monitoring UI is also accessable on any device on your local network (including your phone!) if you use the host computers ip address -- just type in the ip and port such as `http://192.168.0.25/3000` (this is an example, this exact link probablly wont work for you)
 
  
