@@ -180,7 +180,7 @@ command:
 with the following additional options available (shown with implicit defaults):
 
 ```
-  - '-diff=4' # minimum share difficulty to accept from miner(s)
+  - '-mindiff=4' # minimum share difficulty to accept from miner(s)
   - '-extranonce=0' # size in bytes of extranonce
   - '-blockwait=500ms' # time in to wait before manually requesting new block
   - '-hcp=' # port at which healthcheck is exposed (at path '/readyz')
