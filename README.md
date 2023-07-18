@@ -108,9 +108,7 @@ Many of the stats on the graph are averaged over a configurable time period (24h
 
 # Configuration
 
-## Native
-
-Configuration for the bridge running as a native service/executable is done via the [config.yaml](cmd/kaspabridge/config.yaml) file in the same directory as the executable (`./cmd/kaspabridge` from the project root if building from source.)  Available parameters are as follows (note that some parameters are commented out - please uncomment to modify):
+Configuration for the bridge is done via the [config.yaml](cmd/kaspabridge/config.yaml) file in the same directory as the executable, or `./cmd/kaspabridge` from the project root if building from source / using docker.  Available parameters are as follows:
 
 
 ```
@@ -130,11 +128,22 @@ kaspad_address: localhost:16110
 # thereby reducing network traffic and server load, while lower values will 
 # increase the number of shares submitted, thereby reducing the amount of time 
 # needed for accurate hashrate measurements
-# min_share_diff: 4
+# if var_diff is enabled, min_share_diff will be the starting difficulty
+min_share_diff: 64
+
+# var_diff: if true, enables the auto-adjusting variable share diff mechanism. 
+# Starts with the value defined by the 'min_share_diff' setting, then checks 
+# every 10s whether each client is maintaining a 20 shares/minute submission 
+# rate, and sends an updated min diff per client if necessary.  Max tolerance 
+# is +/- 5% after 4hrs.
+var_diff: true
+
+# var_diff_stats: if true, print vardiff engine stats to the log every 10s 
+var_diff_stats: false
 
 # block_wait_time: time to wait since last new block message from kaspad before
 # manually requesting a new block
-# block_wait_time: 500ms
+block_wait_time: 3s
 
 # extranonce_size: size in bytes of extranonce, from 0 (no extranonce) to 3. 
 # With no extranonce (0), all clients will search through the same nonce-space,
@@ -144,7 +153,7 @@ kaspad_address: localhost:16110
 # overall nonce-space (though with 1s block times, this shouldn't really
 # be a concern). 
 # 1 byte = 256 clients, 2 bytes = 65536, 3 bytes = 16777216.
-# extranonce_size: 0
+extranonce_size: 0
 
 # print_stats: if true will print stats to the console, false just workers
 # joining/disconnecting, blocks found, and errors will be printed
@@ -162,33 +171,25 @@ prom_port: :2114
 
 ```
 
-## Docker
-
-Configuration for the bridge running in a docker container is done via command line arguments, which are listed one per line in the 'command' section under the 'ks_bridge' section of the relevant docker compose file ([docker-compose-all-src.yml](docker-compose-all-src.yml) if running all services, or [docker-compose-bridge-src.yml](docker-compose-bridge-src.yml) if running the bridge only).  Parameters are the same as above, although naming is different (sorry).  
-
-Default settings are as follows:
+Config parameters can also be specificied by command line flags, which have slightly different names (these would be added in the 'command' subsection of the 'ks_bridge' section of the appropriate 'docker-compose-*.yml' file for docker installations.)  This method has precedence over the config.yaml file:
 
 ```
-command:
   - '-log=true' # enable/disable logging
   - '-stats=false' # include stats readout every 10s in log
   - '-stratum=:5555' # port to which miners should connect
   - '-prom=:2114' # port at which raw prometheus stats will be available
   - '-kaspa=host.docker.internal:16110' # host/port at which kaspad node is running
-```
-
-with the following additional options available (shown with implicit defaults):
-
-```
-  - '-mindiff=4' # minimum share difficulty to accept from miner(s)
+  - '-mindiff=64' # minimum share difficulty to accept from miner(s)
+  - '-vardiff=true' # enable auto-adjusting variable min diff
+  - '-vardiffstats=false' # include vardiff stats readout every 10s in log
   - '-extranonce=0' # size in bytes of extranonce
-  - '-blockwait=500ms' # time in to wait before manually requesting new block
+  - '-blockwait=3s' # time in to wait before manually requesting new block
   - '-hcp=' # port at which healthcheck is exposed (at path '/readyz')
 ```
 
 ## IceRiver ASICs configuration details
 
-IceRiver ASICs require a 2 byte extranonce, as well as an increased minimum share difficulty.  Without these settings, you may experience lower than expected hashrates.  Recommended minimum difficulty settings for each of the different devices are as follows (should produce roughly 20 shares/min):
+IceRiver ASICs require a 2 byte extranonce, as well as an increased minimum share difficulty.  Without these features enabled, you may experience lower than expected hashrates.  It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you want to set a fixed difficulty, the recommended settings for each of the different devices are as follows (should produce roughly 20 shares/min):
 
 |ASIC | Min Diff |
 | --- | ---- |

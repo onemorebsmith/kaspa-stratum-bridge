@@ -125,18 +125,20 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			if !state.initialized {
 				state.initialized = true
 				state.useBigJob = bigJobRegex.MatchString(client.RemoteApp)
-				// first pass through send the difficulty since it's fixed
+				// first pass through send config/default difficulty
 				state.stratumDiff = newKaspaDiff()
 				state.stratumDiff.setDiffValue(c.minShareDiff)
-				if err := client.Send(gostratum.JsonRpcEvent{
-					Version: "2.0",
-					Method:  "mining.set_difficulty",
-					Params:  []any{state.stratumDiff.diffValue},
-				}); err != nil {
-					RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
-					client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
-					return
-				}
+				sendClientDiff(client, state)
+				c.shareHandler.setClientVardiff(client, c.minShareDiff)
+			}
+
+			varDiff := c.shareHandler.getClientVardiff(client)
+			if varDiff != state.stratumDiff.diffValue {
+				// send updated vardiff
+				client.Logger.Info(fmt.Sprintf("changing diff from %f to %f", state.stratumDiff.diffValue, varDiff))
+				state.stratumDiff.setDiffValue(varDiff)
+				sendClientDiff(client, state)
+				c.shareHandler.startClientVardiff(client)
 			}
 
 			jobParams := []any{fmt.Sprintf("%d", jobId)}
@@ -183,5 +185,17 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 				RecordBalances(balances)
 			}()
 		}
+	}
+}
+
+func sendClientDiff(client *gostratum.StratumContext, state *MiningState) {
+	if err := client.Send(gostratum.JsonRpcEvent{
+		Version: "2.0",
+		Method:  "mining.set_difficulty",
+		Params:  []any{state.stratumDiff.diffValue},
+	}); err != nil {
+		RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
+		client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
+		return
 	}
 }
