@@ -212,13 +212,11 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
 			return err
 		}
+	} else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
+		ctx.Logger.Warn("weak block")
+		RecordWeakShare(ctx)
+		return ctx.ReplyLowDiffShare(event.Id)
 	}
-	// remove for now until I can figure it out. No harm here as we're not
-	// } else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
-	// 	ctx.Logger.Warn("weak block")
-	// 	RecordWeakShare(ctx)
-	// 	return ctx.ReplyLowDiffShare(event.Id)
-	// }
 
 	stats.SharesFound.Add(1)
 	stats.VarDiffSharesFound.Add(1)
