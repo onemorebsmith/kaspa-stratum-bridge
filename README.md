@@ -36,6 +36,11 @@ Tips appreciated:
 ```
 
 
+### Variable difficulty engine (vardiff)
+
+Multiple miners with significantly different hashrates can be connected to the same stratum bridge instance, and the appropriate difficulty will automatically be decided for each one.  Default settings target 15 shares/min, resulting in high confidence decisions regarding difficulty adjustments, and stable measured hashrates (1hr avg hashrates within +/- 10% of actual).
+
+
 ### Optional monitoring UI
 
 Detailed setup [instructions](/docs/monitoring-setup.md) 
@@ -90,7 +95,7 @@ all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 *Note: Best option for users who want access to reporting, and aren't already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
   
 
-`docker compose -f docker-compose-all-src.yml up -d --build` [^1] will run the bridge assuming a local kaspad node with default port settings, and expose port 5555 to incoming stratum connections.  These settings can be overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-all-src.yml](docker-compose-all-src.yml) file.  Additionally, Prometheus (the stats database) and Grafana (the dashboard) will be started and accessible on ports 9090 and 3000 respectively.  Once all services are running, the dashboard should be reachable at <http://127.0.0.1:3000/d/x7cE7G74k1/ksb-monitoring> with default user/pass: admin/admin
+`docker compose -f docker-compose-all-src.yml up -d --build` [^1] will run the bridge assuming a local kaspad node with default port settings, and listen on port 5555 for incoming stratum connections.  These settings can be overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-all-src.yml](docker-compose-all-src.yml) file.  Additionally, Prometheus (the stats database) and Grafana (the dashboard) will be started and accessible on ports 9090 and 3000 respectively.  Once all services are running, the dashboard should be reachable at <http://127.0.0.1:3000/d/x7cE7G74k1/ksb-monitoring> with default user/pass: admin/admin
 
 [^1]: This command builds the bridge component from source, rather than the previous behavior of pulling down a pre-built image.  You may still use the pre-built image by replacing 'docker-compose-all-src.yml' with 'docker-compose-all.yml', but it is not guaranteed to be up to date, so compiling from source is the better alternative.
 
@@ -101,7 +106,7 @@ Many of the stats on the graph are averaged over a configurable time period (24h
 
 *Note: Best option for users who want docker encapsulation, and don't need reporting, or are already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
 
-`docker compose -f docker-compose-bridge-src.yml up -d --build` [^2] will run the bridge assuming a local kaspad node with default port settings, and expose port 5555 to incoming stratum connections.  These settings can be overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-bridge-src.yml](docker-compose-bridge-src.yml) file.  No further services will be enabled.
+`docker compose -f docker-compose-bridge-src.yml up -d --build` [^2] will run the bridge assuming a local kaspad node with default port settings, and listen on port 5555 for incoming stratum connections.  These settings can be overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-bridge-src.yml](docker-compose-bridge-src.yml) file.  No further services will be enabled.
 
 [^2]: This command builds the bridge component from source, rather than the previous behavior of pulling down a pre-built image.  You may still use the pre-built image by issuing the command `docker run -p 5555:5555 onemorebsmith/kaspa_bridge:latest`, but it is not guaranteed to be up to date, so compiling from source is the better alternative.
 
@@ -128,8 +133,14 @@ kaspad_address: localhost:16110
 # thereby reducing network traffic and server load, while lower values will 
 # increase the number of shares submitted, thereby reducing the amount of time 
 # needed for accurate hashrate measurements
-# if var_diff is enabled, min_share_diff will be the starting difficulty
-min_share_diff: 64
+#
+# If var_diff is enabled, min_share_diff will be the starting difficulty.
+#
+# Default value is chosen to accomodate current top of the line IceRiver ASICs.
+# If you don't want to change the default to match your device(s), the vardiff 
+# engine will adjust to an appropriate diff for lower hashrate devices within a 
+# few minutes.
+min_share_diff: 4096
 
 # var_diff: if true, enables the auto-adjusting variable share diff mechanism. 
 # Starts with the value defined by the 'min_share_diff' setting, then checks 
@@ -137,6 +148,22 @@ min_share_diff: 64
 # rate, and sends an updated min diff per client if necessary.  Max tolerance 
 # is +/- 5% after 4hrs.
 var_diff: true
+
+# shares_per_min: number of shares per minute the vardiff engine should target.
+# Default value is chosen to allow for 95% confidence in measurement accuracy, 
+# which affects fidelity of difficulty update decisions, as well as hashrate
+# stability (measured 1hr avg hashrate should be within +/- 10% of actual, with
+# the noted confidence.)  Higher values will result in better vardiff engine
+# performance and increased hashrate stability.  Lower values will cause 
+# vardiff to behave more erratically, while measured hashrate will display 
+# larger variations.
+#
+# Incorrect configuration of this parameter may induce high error rates on 
+# IceRiver devices, so it is recommended to avoid unnecessary changes.
+# 
+# Example values and their resulting confidence levels:
+# 20 => 99%, 15 => 95%, 12 => 90%
+shares_per_min: 15
 
 # var_diff_stats: if true, print vardiff engine stats to the log every 10s 
 var_diff_stats: false
@@ -181,6 +208,7 @@ Config parameters can also be specificied by command line flags, which have slig
   - '-kaspa=host.docker.internal:16110' # host/port at which kaspad node is running
   - '-mindiff=64' # minimum share difficulty to accept from miner(s)
   - '-vardiff=true' # enable auto-adjusting variable min diff
+  - '-sharespermin=15' # number of shares per minute the vardiff engine should target
   - '-vardiffstats=false' # include vardiff stats readout every 10s in log
   - '-extranonce=0' # size in bytes of extranonce
   - '-blockwait=3s' # time in to wait before manually requesting new block
@@ -189,14 +217,14 @@ Config parameters can also be specificied by command line flags, which have slig
 
 ## IceRiver ASICs configuration details
 
-IceRiver ASICs require a 2 byte extranonce, as well as an increased minimum share difficulty.  Without these features enabled, you may experience lower than expected hashrates.  It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you want to set a fixed difficulty, the recommended settings for each of the different devices are as follows (should produce roughly 20 shares/min):
+IceRiver ASICs require a 2 byte extranonce, as well as an increased minimum share difficulty.  Without these features enabled, you may experience lower than expected hashrates.  It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you prefer to set a fixed difficulty, disable vardiff, and consult the following table for the recommended settings for each of the different devices (should produce roughly 15 shares/min):
 
 |ASIC | Min Diff |
 | --- | ---- |
-|KS0  | 65   |
-|KS1  | 650  |
-|KS2  | 1300 |
-|KS3L | 3250 |
-|KS3  | 5200 |
+|KS0  | 85   |
+|KS1  | 850  |
+|KS2  | 1700 |
+|KS3L | 4300 |
+|KS3  | 6900 |
 
 See previous sections for details on setting these parameters for your particular installation.

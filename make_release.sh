@@ -2,7 +2,7 @@ CMD_PATH="../cmd/kaspabridge"
 rm -rf release
 mkdir -p release
 cd release
-VERSION=1.1.9
+VERSION=1.2.0
 ARCHIVE="ks_bridge-${VERSION}"
 OUTFILE="ks_bridge"
 OUTDIR="ks_bridge"

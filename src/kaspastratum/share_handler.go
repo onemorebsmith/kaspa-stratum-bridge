@@ -339,16 +339,15 @@ func stringifyHashrate(ghs float64) string {
 	return fmt.Sprintf("%0.2f%sH/s", hr, unit)
 }
 
-func (sh *shareHandler) startVardiffThread(logStats bool) error {
-	// 20 shares/min allows a ~99% confidence assumption of:
+func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool) error {
+	// 15 shares/min allows a ~95% confidence assumption of:
 	//   < 100% variation after 1m
 	//   < 50% variation after 3m
 	//   < 25% variation after 10m
 	//   < 15% variation after 30m
 	//   < 10% variation after 1h
 	//   < 5% variation after 4h
-	const expectedShareRate = 20
-	var windows = [...]int{1, 3, 10, 30, 60, 240, 0}
+	var windows = [...]uint{1, 3, 10, 30, 60, 240, 0}
 	var tolerances = [...]float64{1, 0.5, 0.25, 0.15, 0.1, 0.05, 0.05}
 
 	for {
@@ -376,7 +375,7 @@ func (sh *shareHandler) startVardiffThread(logStats bool) error {
 			shares := v.VarDiffSharesFound.Load()
 			duration := time.Since(v.VarDiffStartTime).Minutes()
 			shareRate := float64(shares) / duration
-			shareRateRatio := shareRate / expectedShareRate
+			shareRateRatio := shareRate / float64(expectedShareRate)
 			window := windows[v.VarDiffWindow]
 			tolerance := tolerances[v.VarDiffWindow]
 
@@ -422,7 +421,7 @@ func (sh *shareHandler) startVardiffThread(logStats bool) error {
 				if float64(shares) <= float64(window*expectedShareRate)*(1-tolerance) {
 					// submission rate < window min
 					toleranceErrs = append(toleranceErrs, fmt.Sprintf("%s share rate (%f) exceeded lower tolerance (- %d%%) for %dm window", worker, shareRate, int(tolerance*100), window))
-					updateVarDiff(v, diff*shareRateRatio)
+					updateVarDiff(v, diff*math.Max(shareRateRatio, 0.1))
 					continue
 				}
 
