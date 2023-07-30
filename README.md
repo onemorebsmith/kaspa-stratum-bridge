@@ -80,7 +80,7 @@ ks_worker_job_counter{ip="192.168.0.65",miner="BzMiner-v11.1.0",wallet="kaspa:qz
 
 ## Build from source (native executable)
 
-Install go 1.18 using whatever package manager is approprate for your system.
+Install go 1.18 or later using whatever package manager is approprate for your system, or from https://go.dev/doc/install.
 
 run `cd cmd/kaspabridge;go build .`
 
