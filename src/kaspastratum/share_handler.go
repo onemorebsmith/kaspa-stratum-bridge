@@ -88,13 +88,13 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 }
 
 type submitInfo struct {
+	jobId    uint64
 	block    *appmessage.RPCBlock
-	state    *MiningState
 	noncestr string
 	nonceVal uint64
 }
 
-func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) (*submitInfo, error) {
+func validateSubmit(ctx *gostratum.StratumContext, state *MiningState, event gostratum.JsonRpcEvent) (*submitInfo, error) {
 	if len(event.Params) < 3 {
 		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return nil, fmt.Errorf("malformed event, expected at least 2 params")
@@ -104,13 +104,12 @@ func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent)
 		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return nil, fmt.Errorf("unexpected type for param 1: %+v", event.Params...)
 	}
-	jobId, err := strconv.ParseInt(jobIdStr, 10, 0)
+	jobId, err := strconv.ParseUint(jobIdStr, 10, 0)
 	if err != nil {
 		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 		return nil, errors.Wrap(err, "job id is not parsable as an number")
 	}
-	state := GetMiningState(ctx)
-	block, exists := state.GetJob(int(jobId))
+	block, exists := state.GetJob(jobId)
 	if !exists {
 		RecordWorkerError(ctx.WalletAddr, ErrMissingJob)
 		return nil, fmt.Errorf("job does not exist. stale?")
@@ -121,7 +120,7 @@ func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent)
 		return nil, fmt.Errorf("unexpected type for param 2: %+v", event.Params...)
 	}
 	return &submitInfo{
-		state:    state,
+		jobId:    jobId,
 		block:    block,
 		noncestr: strings.Replace(noncestr, "0x", "", 1),
 	}, nil
@@ -132,7 +131,7 @@ var (
 	ErrDupeShare  = fmt.Errorf("duplicate share")
 )
 
-// the max difference between tip blue score and job blue score that we'll accept
+// max difference between tip blue score and job blue score that we'll accept
 // anything greater than this is considered a stale
 const workWindow = 8
 
@@ -151,7 +150,8 @@ func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInf
 }
 
 func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
-	submitInfo, err := validateSubmit(ctx, event)
+	state := GetMiningState(ctx)
+	submitInfo, err := validateSubmit(ctx, state, event)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,6 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	}
 
 	//ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
-	state := GetMiningState(ctx)
 	if state.useBigJob {
 		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
 		if err != nil {
@@ -180,6 +179,62 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	}
+
+	jobId := submitInfo.jobId
+	block := submitInfo.block
+	var invalidShare bool
+	for {
+		ctx.Logger.Info(fmt.Sprintf("checking job ID %d", jobId))
+		converted, err := appmessage.RPCBlockToDomainBlock(block)
+		if err != nil {
+			return fmt.Errorf("failed to cast block to mutable block: %+v", err)
+		}
+		mutableHeader := converted.Header.ToMutable()
+		mutableHeader.SetNonce(submitInfo.nonceVal)
+		powState := pow.NewState(mutableHeader)
+		powValue := powState.CalculateProofOfWorkValue()
+
+		// The block hash must be less or equal than the claimed target.
+		if powValue.Cmp(&powState.Target) <= 0 {
+			// block?
+			if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
+				return err
+			}
+			invalidShare = false
+			break
+		} else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
+			// invalid share, but don't record it yet
+			if jobId == submitInfo.jobId {
+				ctx.Logger.Warn("low diff share... checking for bad job ID")
+				invalidShare = true
+			}
+
+			// stupid hack for busted ass IceRiver/Bitmain ASICs.  Need to loop
+			// through job history because they submit jobs with incorrect IDs
+			if jobId%uint64(state.maxJobs) == 0 {
+				// exhausted all previous blocks
+				break
+			} else {
+				var exists bool
+				jobId -= 1
+				block, exists = state.GetJob(jobId)
+				if !exists {
+					// just exit loop - bad share will be recorded
+					break
+				}
+			}
+		} else {
+			// valid share
+			break
+		}
+	}
+
+	if invalidShare {
+		ctx.Logger.Warn("low diff share confirmed")
+		RecordWeakShare(ctx)
+		return ctx.ReplyLowDiffShare(event.Id)
+	}
+
 	stats := sh.getCreateStats(ctx)
 	// if err := sh.checkStales(ctx, submitInfo); err != nil {
 	// 	if err == ErrDupeShare {
@@ -197,27 +252,6 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	// 	ctx.Logger.Error("unknown error during check stales: ", err.Error())
 	// 	return ctx.ReplyBadShare(event.Id)
 	// }
-
-	converted, err := appmessage.RPCBlockToDomainBlock(submitInfo.block)
-	if err != nil {
-		return fmt.Errorf("failed to cast block to mutable block: %+v", err)
-	}
-	mutableHeader := converted.Header.ToMutable()
-	mutableHeader.SetNonce(submitInfo.nonceVal)
-	powState := pow.NewState(mutableHeader)
-	powValue := powState.CalculateProofOfWorkValue()
-
-	// The block hash must be less or equal than the claimed target.
-	if powValue.Cmp(&powState.Target) <= 0 {
-		if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
-			return err
-		}
-	} else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
-		ctx.Logger.Warn("weak block")
-		RecordWeakShare(ctx)
-		return ctx.ReplyLowDiffShare(event.Id)
-	}
-
 	stats.SharesFound.Add(1)
 	stats.VarDiffSharesFound.Add(1)
 	stats.SharesDiff.Add(state.stratumDiff.hashValue)
