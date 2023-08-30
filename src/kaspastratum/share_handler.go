@@ -225,6 +225,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 			}
 		} else {
 			// valid share
+			invalidShare = false
 			break
 		}
 	}
