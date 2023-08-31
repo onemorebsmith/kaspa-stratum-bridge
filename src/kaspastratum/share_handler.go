@@ -151,6 +151,8 @@ func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInf
 
 func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
 	state := GetMiningState(ctx)
+	maxJobs := uint64(state.maxJobs)
+
 	submitInfo, err := validateSubmit(ctx, state, event)
 	if err != nil {
 		return err
@@ -211,7 +213,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 			// stupid hack for busted ass IceRiver/Bitmain ASICs.  Need to loop
 			// through job history because they submit jobs with incorrect IDs
-			if jobId%uint64(state.maxJobs) == 0 {
+			if jobId%maxJobs == submitInfo.jobId%maxJobs+1 {
 				// exhausted all previous blocks
 				break
 			} else {
@@ -481,6 +483,12 @@ func updateVarDiff(stats *WorkStats, minDiff float64) float64 {
 	stats.VarDiffStartTime = time.Time{}
 	stats.VarDiffWindow = 0
 	previousMinDiff := stats.MinDiff.Load()
+	// need to round to integers for broken IceRiver/Bitmain ASICs
+	// not worrying about < 1, since they should never use a diff
+	// that low
+	if minDiff > 1 {
+		minDiff = math.Round(minDiff)
+	}
 	stats.MinDiff.Store(math.Max(0.1, minDiff))
 	return previousMinDiff
 }
