@@ -186,7 +186,6 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	block := submitInfo.block
 	var invalidShare bool
 	for {
-		ctx.Logger.Info(fmt.Sprintf("checking job ID %d", jobId))
 		converted, err := appmessage.RPCBlockToDomainBlock(block)
 		if err != nil {
 			return fmt.Errorf("failed to cast block to mutable block: %+v", err)
@@ -207,18 +206,18 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		} else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
 			// invalid share, but don't record it yet
 			if jobId == submitInfo.jobId {
-				ctx.Logger.Warn("low diff share... checking for bad job ID")
+				ctx.Logger.Warn(fmt.Sprintf("low diff share... checking for bad job ID (%d)", jobId))
 				invalidShare = true
 			}
 
 			// stupid hack for busted ass IceRiver/Bitmain ASICs.  Need to loop
 			// through job history because they submit jobs with incorrect IDs
-			if jobId == 0 || jobId%maxJobs == submitInfo.jobId%maxJobs+1 {
+			if jobId == 1 || jobId%maxJobs == submitInfo.jobId%maxJobs+1 {
 				// exhausted all previous blocks
 				break
 			} else {
 				var exists bool
-				jobId -= 1
+				jobId--
 				block, exists = state.GetJob(jobId)
 				if !exists {
 					// just exit loop - bad share will be recorded
@@ -227,7 +226,10 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 			}
 		} else {
 			// valid share
-			invalidShare = false
+			if invalidShare {
+				ctx.Logger.Warn(fmt.Sprintf("found correct job ID: %d", jobId))
+				invalidShare = false
+			}
 			break
 		}
 	}

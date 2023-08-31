@@ -198,4 +198,5 @@ func sendClientDiff(client *gostratum.StratumContext, state *MiningState) {
 		client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
 		return
 	}
+	client.Logger.Info(fmt.Sprintf("Setting client diff: %f", state.stratumDiff.diffValue))
 }
