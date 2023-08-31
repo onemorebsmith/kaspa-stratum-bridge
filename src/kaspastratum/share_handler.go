@@ -213,7 +213,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 			// stupid hack for busted ass IceRiver/Bitmain ASICs.  Need to loop
 			// through job history because they submit jobs with incorrect IDs
-			if jobId%maxJobs == submitInfo.jobId%maxJobs+1 {
+			if jobId == 0 || jobId%maxJobs == submitInfo.jobId%maxJobs+1 {
 				// exhausted all previous blocks
 				break
 			} else {
