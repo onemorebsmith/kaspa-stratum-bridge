@@ -23,6 +23,13 @@ kaspad_address: localhost:16110
 # few minutes.
 min_share_diff: 4096
 
+# pow2_clamp: restrict difficulty to 2^n. This is required for IceRiver and 
+# BitMain ASICs, where difficulties further away from powers of 2 cause higher
+# error rates.  Using this feature will limit the functionality of vardiff,
+# such that the shares_per_min becomes more of a minimum, rather than a target 
+# we can expect to converge on.
+pow2_clamp: false
+
 # var_diff: if true, enables the auto-adjusting variable share diff mechanism. 
 # Starts with the value defined by the 'min_share_diff' setting, then checks 
 # every 10s whether each client is maintaining a 20 shares/minute submission 
@@ -31,7 +38,7 @@ min_share_diff: 4096
 var_diff: true
 
 # shares_per_min: number of shares per minute the vardiff engine should target.
-# Default value is chosen to allow for 95% confidence in measurement accuracy, 
+# Default value is chosen to allow for 99% confidence in measurement accuracy, 
 # which affects fidelity of difficulty update decisions, as well as hashrate
 # stability (measured 1hr avg hashrate should be within +/- 10% of actual, with
 # the noted confidence.)  Higher values will result in better vardiff engine
@@ -44,7 +51,7 @@ var_diff: true
 # 
 # Example values and their resulting confidence levels:
 # 20 => 99%, 15 => 95%, 12 => 90%
-shares_per_min: 15
+shares_per_min: 20
 
 # var_diff_stats: if true, print vardiff engine stats to the log every 10s 
 var_diff_stats: false

@@ -38,7 +38,7 @@ Tips appreciated:
 
 ### Variable difficulty engine (vardiff)
 
-Multiple miners with significantly different hashrates can be connected to the same stratum bridge instance, and the appropriate difficulty will automatically be decided for each one.  Default settings target 15 shares/min, resulting in high confidence decisions regarding difficulty adjustments, and stable measured hashrates (1hr avg hashrates within +/- 10% of actual).
+Multiple miners with significantly different hashrates can be connected to the same stratum bridge instance, and the appropriate difficulty will automatically be decided for each one.  Default settings target 20 shares/min, resulting in high confidence decisions regarding difficulty adjustments, and stable measured hashrates (1hr avg hashrates within +/- 10% of actual).
 
 
 ### Optional monitoring UI
@@ -142,6 +142,13 @@ kaspad_address: localhost:16110
 # few minutes.
 min_share_diff: 4096
 
+# pow2_clamp: restrict difficulty to 2^n (e.g. 64, 128, 256, etc). This is 
+# required for IceRiver and BitMain ASICs, where difficulties further away from
+# powers of 2 cause higher error rates.  Using this feature will limit the 
+# functionality of vardiff, such that the shares_per_min becomes more of a 
+# minimum, rather than a target we can expect to converge on.
+pow2_clamp: false
+
 # var_diff: if true, enables the auto-adjusting variable share diff mechanism. 
 # Starts with the value defined by the 'min_share_diff' setting, then checks 
 # every 10s whether each client is maintaining a 20 shares/minute submission 
@@ -150,7 +157,7 @@ min_share_diff: 4096
 var_diff: true
 
 # shares_per_min: number of shares per minute the vardiff engine should target.
-# Default value is chosen to allow for 95% confidence in measurement accuracy, 
+# Default value is chosen to allow for 99% confidence in measurement accuracy, 
 # which affects fidelity of difficulty update decisions, as well as hashrate
 # stability (measured 1hr avg hashrate should be within +/- 10% of actual, with
 # the noted confidence.)  Higher values will result in better vardiff engine
@@ -163,13 +170,13 @@ var_diff: true
 # 
 # Example values and their resulting confidence levels:
 # 20 => 99%, 15 => 95%, 12 => 90%
-shares_per_min: 15
+shares_per_min: 20
 
 # var_diff_stats: if true, print vardiff engine stats to the log every 10s 
 var_diff_stats: false
 
 # block_wait_time: time to wait since last new block message from kaspad before
-# manually requesting a new block
+# manually requesting a new block.  Examples are '500ms', '3s', '1m', etc.
 block_wait_time: 3s
 
 # extranonce_size: size in bytes of extranonce, from 0 (no extranonce) to 3. 
@@ -208,7 +215,8 @@ Config parameters can also be specificied by command line flags, which have slig
   - '-kaspa=host.docker.internal:16110' # host/port at which kaspad node is running
   - '-mindiff=64' # minimum share difficulty to accept from miner(s)
   - '-vardiff=true' # enable auto-adjusting variable min diff
-  - '-sharespermin=15' # number of shares per minute the vardiff engine should target
+  - '-pow2clamp=false' # limit diff to 2^n (e.g. 64, 128, 256, etc)
+  - '-sharespermin=20' # number of shares per minute the vardiff engine should target
   - '-vardiffstats=false' # include vardiff stats readout every 10s in log
   - '-extranonce=0' # size in bytes of extranonce
   - '-blockwait=3s' # time in to wait before manually requesting new block
@@ -217,14 +225,14 @@ Config parameters can also be specificied by command line flags, which have slig
 
 ## IceRiver ASICs configuration details
 
-IceRiver ASICs require a 2 byte extranonce, as well as an increased minimum share difficulty.  Without these features enabled, you may experience lower than expected hashrates.  It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you prefer to set a fixed difficulty, disable vardiff, and consult the following table for the recommended settings for each of the different devices (should produce roughly 15 shares/min):
+IceRiver ASICs require a 2 byte extranonce (extranonce_size=2), an increased minimum share difficulty (use vardiff, or see table below), and difficulty values limited to 2^n (pow2_clamp=true).  Without these settings, you may experience lower than expected hashrates and/or high invalid rates.  It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you prefer to set a fixed difficulty, disable vardiff, and consult the following table for the recommended settings for each of the different devices (should produce minimum 20 shares/min):
 
 |ASIC | Min Diff |
 | --- | ---- |
-|KS0  | 85   |
-|KS1  | 850  |
-|KS2  | 1700 |
-|KS3L | 4300 |
-|KS3  | 6900 |
+|KS0  | 64   |
+|KS1  | 512  |
+|KS2  | 1024 |
+|KS3L | 2048 |
+|KS3  | 4096 |
 
 See previous sections for details on setting these parameters for your particular installation.

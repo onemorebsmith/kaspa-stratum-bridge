@@ -2,6 +2,7 @@ package kaspastratum
 
 import (
 	"context"
+	"math"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -29,6 +30,7 @@ type BridgeConfig struct {
 	SharesPerMin    uint          `yaml:"shares_per_min"`
 	VarDiffStats    bool          `yaml:"var_diff_stats"`
 	ExtranonceSize  uint          `yaml:"extranonce_size"`
+	ClampPow2       bool          `yaml:"pow2_clamp"`
 }
 
 func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
@@ -80,15 +82,18 @@ func ListenAndServe(cfg BridgeConfig) error {
 	}
 
 	shareHandler := newShareHandler(ksApi.kaspad)
-	minDiff := cfg.MinShareDiff
+	minDiff := float64(cfg.MinShareDiff)
 	if minDiff == 0 {
 		minDiff = 4
+	}
+	if cfg.ClampPow2 {
+		minDiff = math.Pow(2, math.Floor(math.Log2(minDiff)))
 	}
 	extranonceSize := cfg.ExtranonceSize
 	if extranonceSize > 3 {
 		extranonceSize = 3
 	}
-	clientHandler := newClientListener(logger, shareHandler, float64(minDiff), int8(extranonceSize))
+	clientHandler := newClientListener(logger, shareHandler, minDiff, int8(extranonceSize))
 	handlers := gostratum.DefaultHandlers()
 	// override the submit handler with an actual useful handler
 	handlers[string(gostratum.StratumMethodSubmit)] =
@@ -114,7 +119,11 @@ func ListenAndServe(cfg BridgeConfig) error {
 	})
 
 	if cfg.VarDiff {
-		go shareHandler.startVardiffThread(cfg.SharesPerMin, cfg.VarDiffStats)
+		sharesPerMin := cfg.SharesPerMin
+		if sharesPerMin <= 0 {
+			sharesPerMin = 20
+		}
+		go shareHandler.startVardiffThread(sharesPerMin, cfg.VarDiffStats, cfg.ClampPow2)
 	}
 
 	if cfg.PrintStats {

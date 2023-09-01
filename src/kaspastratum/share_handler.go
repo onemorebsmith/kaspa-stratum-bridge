@@ -378,8 +378,8 @@ func stringifyHashrate(ghs float64) string {
 	return fmt.Sprintf("%0.2f%sH/s", hr, unit)
 }
 
-func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool) error {
-	// 15 shares/min allows a ~95% confidence assumption of:
+func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool, clamp bool) error {
+	// 20 shares/min allows a ~99% confidence assumption of:
 	//   < 100% variation after 1m
 	//   < 50% variation after 3m
 	//   < 25% variation after 10m
@@ -425,7 +425,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 				if math.Abs(1-shareRateRatio) >= tolerance {
 					// final stage submission rate OOB
 					toleranceErrs = append(toleranceErrs, fmt.Sprintf("%s final share rate (%f) exceeded tolerance (+/- %d%%)", worker, shareRate, int(tolerance*100)))
-					updateVarDiff(v, diff*shareRateRatio)
+					updateVarDiff(v, diff*shareRateRatio, clamp)
 				}
 				continue
 			}
@@ -436,7 +436,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 				if math.Abs(1-shareRateRatio) >= tolerances[i] {
 					// breached tolerance of previously cleared window
 					toleranceErrs = append(toleranceErrs, fmt.Sprintf("%s share rate (%f) exceeded tolerance (+/- %d%%) for %dm window", worker, shareRate, int(tolerances[i]*100), windows[i]))
-					updateVarDiff(v, diff*shareRateRatio)
+					updateVarDiff(v, diff*shareRateRatio, clamp)
 					break
 				}
 				i++
@@ -450,7 +450,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 			if float64(shares) >= float64(window*expectedShareRate)*(1+tolerance) {
 				// submission rate > window max
 				toleranceErrs = append(toleranceErrs, fmt.Sprintf("%s share rate (%f) exceeded upper tolerance (+ %d%%) for %dm window", worker, shareRate, int(tolerance*100), window))
-				updateVarDiff(v, diff*shareRateRatio)
+				updateVarDiff(v, diff*shareRateRatio, clamp)
 				continue
 			}
 
@@ -460,7 +460,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 				if float64(shares) <= float64(window*expectedShareRate)*(1-tolerance) {
 					// submission rate < window min
 					toleranceErrs = append(toleranceErrs, fmt.Sprintf("%s share rate (%f) exceeded lower tolerance (- %d%%) for %dm window", worker, shareRate, int(tolerance*100), window))
-					updateVarDiff(v, diff*math.Max(shareRateRatio, 0.1))
+					updateVarDiff(v, diff*math.Max(shareRateRatio, 0.1), clamp)
 					continue
 				}
 
@@ -481,17 +481,17 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 
 // update vardiff with new mindiff, reset counters, and disable tracker until
 // client handler restarts it while sending diff on next block
-func updateVarDiff(stats *WorkStats, minDiff float64) float64 {
-	stats.VarDiffStartTime = time.Time{}
-	stats.VarDiffWindow = 0
-	previousMinDiff := stats.MinDiff.Load()
-	// need to round to integers for broken IceRiver/Bitmain ASICs
-	// not worrying about < 1, since they should never use a diff
-	// that low
-	if minDiff > 1 {
-		minDiff = math.Round(minDiff)
+func updateVarDiff(stats *WorkStats, minDiff float64, clamp bool) float64 {
+	if clamp {
+		minDiff = math.Pow(2, math.Floor(math.Log2(minDiff)))
 	}
-	stats.MinDiff.Store(math.Max(0.1, minDiff))
+
+	previousMinDiff := stats.MinDiff.Load()
+	if minDiff != previousMinDiff {
+		stats.VarDiffStartTime = time.Time{}
+		stats.VarDiffWindow = 0
+		stats.MinDiff.Store(math.Max(0.125, minDiff))
+	}
 	return previousMinDiff
 }
 
@@ -515,7 +515,9 @@ func (sh *shareHandler) getClientVardiff(ctx *gostratum.StratumContext) float64 
 
 func (sh *shareHandler) setClientVardiff(ctx *gostratum.StratumContext, minDiff float64) float64 {
 	stats := sh.getCreateStats(ctx)
-	previousMinDiff := updateVarDiff(stats, minDiff)
+	// only called for initial diff setting, and clamping is handled during
+	// config load
+	previousMinDiff := updateVarDiff(stats, minDiff, false)
 	startVarDiff(stats)
 	return previousMinDiff
 }
