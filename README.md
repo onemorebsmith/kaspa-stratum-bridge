@@ -80,22 +80,25 @@ ks_worker_job_counter{ip="192.168.0.65",miner="BzMiner-v11.1.0",wallet="kaspa:qz
 
 ## Build from source (native executable)
 
-Install go 1.18 or later using whatever package manager is approprate for your system, or from https://go.dev/doc/install.
+* Install go 1.18 or later using whatever package manager is approprate for your system, or from https://go.dev/doc/install.
 
-run `cd cmd/kaspabridge;go build .`
+* run `cd cmd/kaspabridge;go build .`
 
-Modify the config file in ./cmd/bridge/config.yaml with your setup, the file comments explain the various flags
+* Modify the config file in ./cmd/bridge/config.yaml with your setup, the file comments explain the various flags
 
-run `./kaspabridge` in the `cmd/kaspabridge` directory
+* run `./kaspabridge` in the `cmd/kaspabridge` directory
 
-all-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
+All-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 
 ## Docker all-in-one
 
-*Note: Best option for users who want access to reporting, and aren't already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
+*Best option for users who want access to reporting, and aren't already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
   
+* [Install Docker](https://docs.docker.com/engine/install/) using the appropriate method for your OS.  The docker commands below are assuming a server type installation - details may be different for a desktop installation.
 
-`docker compose -f docker-compose-all-src.yml up -d --build` [^1] will run the bridge assuming a local kaspad node with default port settings, and listen on port 5555 for incoming stratum connections.  These settings can be overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-all-src.yml](docker-compose-all-src.yml) file.  Additionally, Prometheus (the stats database) and Grafana (the dashboard) will be started and accessible on ports 9090 and 3000 respectively.  Once all services are running, the dashboard should be reachable at <http://127.0.0.1:3000/d/x7cE7G74k1/ksb-monitoring> with default user/pass: admin/admin
+* Clone this repository using git (`git clone https://github.com/rdugan/kaspa-stratum-bridge.git`) or download and unpack the [zip file](https://github.com/rdugan/kaspa-stratum-bridge/archive/refs/heads/main.zip)
+
+* Enter the 'kaspa-stratum-bridge' directory and type the command `docker compose -f docker-compose-all-src.yml up -d --build` [^1].  This will run the bridge assuming a local kaspad node with default port settings, and listen on port 5555 for incoming stratum connections.  These settings can be updated in the [config.yaml](cmd/kaspabridge/config.yaml) file, or overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-all-src.yml](docker-compose-all-src.yml) file.  Additionally, Prometheus (the stats database) and Grafana (the dashboard) will be started and accessible on ports 9090 and 3000 respectively.  Once all services are running, the dashboard should be reachable at <http://127.0.0.1:3000/d/x7cE7G74k1/ksb-monitoring> with default user/pass: admin/admin
 
 [^1]: This command builds the bridge component from source, rather than the previous behavior of pulling down a pre-built image.  You may still use the pre-built image by replacing 'docker-compose-all-src.yml' with 'docker-compose-all.yml', but it is not guaranteed to be up to date, so compiling from source is the better alternative.
 
@@ -104,9 +107,13 @@ Many of the stats on the graph are averaged over a configurable time period (24h
 
 ## Docker bridge only
 
-*Note: Best option for users who want docker encapsulation, and don't need reporting, or are already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
+*Best option for users who want docker encapsulation, and don't need reporting, or are already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
 
-`docker compose -f docker-compose-bridge-src.yml up -d --build` [^2] will run the bridge assuming a local kaspad node with default port settings, and listen on port 5555 for incoming stratum connections.  These settings can be overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-bridge-src.yml](docker-compose-bridge-src.yml) file.  No further services will be enabled.
+* [Install Docker](https://docs.docker.com/engine/install/) using the appropriate method for your OS.  The docker commands below are assuming a server type installation - details may be different for a desktop installation.
+
+* Clone this repository using git (`git clone https://github.com/rdugan/kaspa-stratum-bridge.git`) or download and unpack the [zip file](https://github.com/rdugan/kaspa-stratum-bridge/archive/refs/heads/main.zip)
+
+* Enter the 'kaspa-stratum-bridge' directory and type the command `docker compose -f docker-compose-bridge-src.yml up -d --build` [^2]. This will run the bridge assuming a local kaspad node with default port settings, and listen on port 5555 for incoming stratum connections.  These settings can be updated in the [config.yaml](cmd/kaspabridge/config.yaml) file, or overridden by modifying/adding/deleting the parameters in the 'command' section of the [docker-compose-bridge-src.yml](docker-compose-bridge-src.yml) file.  No further services will be enabled.
 
 [^2]: This command builds the bridge component from source, rather than the previous behavior of pulling down a pre-built image.  You may still use the pre-built image by issuing the command `docker run -p 5555:5555 onemorebsmith/kaspa_bridge:latest`, but it is not guaranteed to be up to date, so compiling from source is the better alternative.
 
