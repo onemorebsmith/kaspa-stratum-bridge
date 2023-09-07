@@ -234,13 +234,16 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		}
 	}
 
+	stats := sh.getCreateStats(ctx)
+
 	if invalidShare {
 		ctx.Logger.Warn("low diff share confirmed")
+		stats.InvalidShares.Add(1)
+		sh.overall.InvalidShares.Add(1)
 		RecordWeakShare(ctx)
 		return ctx.ReplyLowDiffShare(event.Id)
 	}
 
-	stats := sh.getCreateStats(ctx)
 	// if err := sh.checkStales(ctx, submitInfo); err != nil {
 	// 	if err == ErrDupeShare {
 	// 		ctx.Logger.Info("dupe share "+submitInfo.noncestr, ctx.WorkerName, ctx.WalletAddr)
