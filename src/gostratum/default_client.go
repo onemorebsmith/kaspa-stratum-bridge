@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
+	"github.com/onemorebsmith/kaspastratum/src/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -25,7 +27,7 @@ func DefaultLogger() *zap.Logger {
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	return zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),
-		zapcore.AddSync(colorable.NewColorableStdout()),
+		&utils.BufferedWriteSyncer{WS: zapcore.AddSync(colorable.NewColorableStdout()), FlushInterval: 5 * time.Second},
 		zapcore.DebugLevel,
 	))
 }
