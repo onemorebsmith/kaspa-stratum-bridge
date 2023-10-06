@@ -96,7 +96,7 @@ func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
 	var err error
 	if bitmainRegex.MatchString(ctx.RemoteApp) {
 		err = ctx.Reply(NewResponse(event,
-			[]any{[]any{}, ctx.Extranonce, 0}, nil))
+			[]any{[]any{}, ctx.Extranonce, 8 - (len(ctx.Extranonce) / 2)}, nil))
 	} else {
 		err = ctx.Reply(NewResponse(event,
 			[]any{true, "EthereumStratum/1.0.0"}, nil))
@@ -116,7 +116,13 @@ func HandleSubmit(ctx *StratumContext, event JsonRpcEvent) error {
 }
 
 func SendExtranonce(ctx *StratumContext) {
-	if err := ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce})); err != nil {
+	var err error
+	if bitmainRegex.MatchString(ctx.RemoteApp) {
+		err = ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce, 8 - (len(ctx.Extranonce) / 2)}))
+	} else {
+		err = ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce}))
+	}
+	if err != nil {
 		// should we doing anything further on failure
 		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))
 	}
