@@ -96,7 +96,7 @@ func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
 	var err error
 	if bitmainRegex.MatchString(ctx.RemoteApp) {
 		err = ctx.Reply(NewResponse(event,
-			[]any{[]any{}, ctx.Extranonce, len(ctx.Extranonce) / 2}, nil))
+			[]any{[]any{}, ctx.Extranonce, 0}, nil))
 	} else {
 		err = ctx.Reply(NewResponse(event,
 			[]any{true, "EthereumStratum/1.0.0"}, nil))
