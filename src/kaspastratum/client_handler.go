@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var bigJobRegex = regexp.MustCompile(".*(BzMiner|IceRiverMiner).*")
+var bigJobRegex = regexp.MustCompile(".*(BzMiner|IceRiverMiner|GodMiner).*")
 
 const balanceDelay = time.Minute
 
@@ -130,15 +130,15 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 				state.stratumDiff.setDiffValue(c.minShareDiff)
 				sendClientDiff(client, state)
 				c.shareHandler.setClientVardiff(client, c.minShareDiff)
-			}
-
-			varDiff := c.shareHandler.getClientVardiff(client)
-			if varDiff != state.stratumDiff.diffValue {
-				// send updated vardiff
-				client.Logger.Info(fmt.Sprintf("changing diff from %f to %f", state.stratumDiff.diffValue, varDiff))
-				state.stratumDiff.setDiffValue(varDiff)
-				sendClientDiff(client, state)
-				c.shareHandler.startClientVardiff(client)
+			} else {
+				varDiff := c.shareHandler.getClientVardiff(client)
+				if varDiff != state.stratumDiff.diffValue && varDiff != 0 {
+					// send updated vardiff
+					client.Logger.Info(fmt.Sprintf("changing diff from %f to %f", state.stratumDiff.diffValue, varDiff))
+					state.stratumDiff.setDiffValue(varDiff)
+					sendClientDiff(client, state)
+					c.shareHandler.startClientVardiff(client)
+				}
 			}
 
 			jobParams := []any{fmt.Sprintf("%d", jobId)}
