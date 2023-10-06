@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var bitmainRegex = regexp.MustCompile(".*(GodMiner).*")
+
 type StratumMethod string
 
 const (
@@ -85,15 +87,22 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 }
 
 func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
-	if err := ctx.Reply(NewResponse(event,
-		[]any{true, "EthereumStratum/1.0.0"}, nil)); err != nil {
-		return errors.Wrap(err, "failed to send response to subscribe")
-	}
 	if len(event.Params) > 0 {
 		app, ok := event.Params[0].(string)
 		if ok {
 			ctx.RemoteApp = app
 		}
+	}
+	var err error
+	if bitmainRegex.MatchString(ctx.RemoteApp) {
+		err = ctx.Reply(NewResponse(event,
+			[]any{[]any{}, ctx.Extranonce, len(ctx.Extranonce) / 2}, nil))
+	} else {
+		err = ctx.Reply(NewResponse(event,
+			[]any{true, "EthereumStratum/1.0.0"}, nil))
+	}
+	if err != nil {
+		return errors.Wrap(err, "failed to send response to subscribe")
 	}
 
 	ctx.Logger.Info("client subscribed ", zap.Any("context", ctx))
