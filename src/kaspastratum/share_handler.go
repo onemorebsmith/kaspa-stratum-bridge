@@ -63,12 +63,13 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	if ctx.WorkerName != "" {
 		stats, found = sh.stats[ctx.WorkerName]
 	}
+	workerId := fmt.Sprintf("%s:%d", ctx.RemoteAddr, ctx.RemotePort)
 	if !found { // no worker name, check by remote address
-		stats, found = sh.stats[ctx.RemoteAddr]
+		stats, found = sh.stats[workerId]
 		if found {
 			// no worker name, but remote addr is there
-			// so replacet the remote addr with the worker names
-			delete(sh.stats, ctx.RemoteAddr)
+			// so replace the remote addr with the worker names
+			delete(sh.stats, workerId)
 			stats.WorkerName = ctx.WorkerName
 			sh.stats[ctx.WorkerName] = stats
 		}
@@ -76,9 +77,9 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	if !found { // legit doesn't exist, create it
 		stats = &WorkStats{}
 		stats.LastShare = time.Now()
-		stats.WorkerName = ctx.RemoteAddr
+		stats.WorkerName = workerId
 		stats.StartTime = time.Now()
-		sh.stats[ctx.RemoteAddr] = stats
+		sh.stats[workerId] = stats
 
 		// TODO: not sure this is the best place, nor whether we shouldn't be
 		// resetting on disconnect
@@ -410,12 +411,13 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 		var toleranceErrs []string
 
 		for _, v := range sh.stats {
+			worker := v.WorkerName
 			if v.VarDiffStartTime.IsZero() {
 				// no vardiff sent to client
+				toleranceErrs = append(toleranceErrs, fmt.Sprintf("no diff sent to client %s", worker))
 				continue
 			}
 
-			worker := v.WorkerName
 			diff := v.MinDiff.Load()
 			shares := v.VarDiffSharesFound.Load()
 			duration := time.Since(v.VarDiffStartTime).Minutes()
@@ -476,7 +478,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 		sort.Strings(statsLines)
 		stats += strings.Join(statsLines, "\n")
 		stats += "\n\n========================================================== ks_bridge_" + version + " ===\n"
-		stats += strings.Join(toleranceErrs, "\n")
+		stats += "\n" + strings.Join(toleranceErrs, "\n") + "\n\n"
 		if logStats {
 			bws.Write([]byte(stats))
 		}
@@ -493,10 +495,12 @@ func updateVarDiff(stats *WorkStats, minDiff float64, clamp bool) float64 {
 	}
 
 	previousMinDiff := stats.MinDiff.Load()
-	if minDiff != previousMinDiff {
+	newMinDiff := math.Max(0.125, minDiff)
+	if newMinDiff != previousMinDiff {
+		log.Printf("updating vardiff to %f for client %s", newMinDiff, stats.WorkerName)
 		stats.VarDiffStartTime = time.Time{}
 		stats.VarDiffWindow = 0
-		stats.MinDiff.Store(math.Max(0.125, minDiff))
+		stats.MinDiff.Store(newMinDiff)
 	}
 	return previousMinDiff
 }
