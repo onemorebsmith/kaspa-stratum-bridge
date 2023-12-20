@@ -4,20 +4,25 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
+	"github.com/onemorebsmith/kaspastratum/src/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+var bitmainRegex = regexp.MustCompile(".*(GodMiner).*")
+
 type StratumMethod string
 
 const (
-	StratumMethodSubscribe StratumMethod = "mining.subscribe"
-	StratumMethodAuthorize StratumMethod = "mining.authorize"
-	StratumMethodSubmit    StratumMethod = "mining.submit"
+	StratumMethodSubscribe           StratumMethod = "mining.subscribe"
+	StratumMethodExtranonceSubscribe StratumMethod = "mining.extranonce.subscribe"
+	StratumMethodAuthorize           StratumMethod = "mining.authorize"
+	StratumMethodSubmit              StratumMethod = "mining.submit"
 )
 
 func DefaultLogger() *zap.Logger {
@@ -25,7 +30,7 @@ func DefaultLogger() *zap.Logger {
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	return zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),
-		zapcore.AddSync(colorable.NewColorableStdout()),
+		&utils.BufferedWriteSyncer{WS: zapcore.AddSync(colorable.NewColorableStdout()), FlushInterval: 5 * time.Second},
 		zapcore.DebugLevel,
 	))
 }
@@ -41,9 +46,10 @@ func DefaultConfig(logger *zap.Logger) StratumListenerConfig {
 
 func DefaultHandlers() StratumHandlerMap {
 	return StratumHandlerMap{
-		string(StratumMethodSubscribe): HandleSubscribe,
-		string(StratumMethodAuthorize): HandleAuthorize,
-		string(StratumMethodSubmit):    HandleSubmit,
+		string(StratumMethodSubscribe):           HandleSubscribe,
+		string(StratumMethodExtranonceSubscribe): HandleExtranonceSubscribe,
+		string(StratumMethodAuthorize):           HandleAuthorize,
+		string(StratumMethodSubmit):              HandleSubmit,
 	}
 }
 
@@ -83,18 +89,35 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 }
 
 func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
-	if err := ctx.Reply(NewResponse(event,
-		[]any{true, "EthereumStratum/1.0.0"}, nil)); err != nil {
-		return errors.Wrap(err, "failed to send response to subscribe")
-	}
 	if len(event.Params) > 0 {
 		app, ok := event.Params[0].(string)
 		if ok {
 			ctx.RemoteApp = app
 		}
 	}
+	var err error
+	if bitmainRegex.MatchString(ctx.RemoteApp) {
+		err = ctx.Reply(NewResponse(event,
+			[]any{nil, ctx.Extranonce, 8 - (len(ctx.Extranonce) / 2)}, nil))
+	} else {
+		err = ctx.Reply(NewResponse(event,
+			[]any{true, "EthereumStratum/1.0.0"}, nil))
+	}
+	if err != nil {
+		return errors.Wrap(err, "failed to send response to subscribe")
+	}
 
 	ctx.Logger.Info("client subscribed ", zap.Any("context", ctx))
+	return nil
+}
+
+func HandleExtranonceSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
+	err := ctx.Reply(NewResponse(event, true, nil))
+	if err != nil {
+		return errors.Wrap(err, "failed to send response to extranonce subscribe")
+	}
+
+	ctx.Logger.Info("client subscribed to extranonce ", zap.Any("context", ctx))
 	return nil
 }
 
@@ -105,7 +128,13 @@ func HandleSubmit(ctx *StratumContext, event JsonRpcEvent) error {
 }
 
 func SendExtranonce(ctx *StratumContext) {
-	if err := ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce})); err != nil {
+	var err error
+	if bitmainRegex.MatchString(ctx.RemoteApp) {
+		err = ctx.Send(NewEvent("", "mining.set_extranonce", []any{ctx.Extranonce, 8 - (len(ctx.Extranonce) / 2)}))
+	} else {
+		err = ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce}))
+	}
+	if err != nil {
 		// should we doing anything further on failure
 		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
+	"github.com/onemorebsmith/kaspastratum/src/utils"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -39,9 +40,11 @@ func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
 	fileEncoder := zapcore.NewJSONEncoder(pe)
 	consoleEncoder := zapcore.NewConsoleEncoder(pe)
 
+	bws := &utils.BufferedWriteSyncer{WS: zapcore.AddSync(colorable.NewColorableStdout()), FlushInterval: 5 * time.Second}
+
 	if !cfg.UseLogFile {
 		return zap.New(zapcore.NewCore(consoleEncoder,
-			zapcore.AddSync(colorable.NewColorableStdout()), zap.InfoLevel)).Sugar(), func() {}
+			bws, zap.InfoLevel)).Sugar(), func() { bws.Stop() }
 	}
 
 	// log file fun
@@ -49,11 +52,12 @@ func configureZap(cfg BridgeConfig) (*zap.SugaredLogger, func()) {
 	if err != nil {
 		panic(err)
 	}
+	blws := &utils.BufferedWriteSyncer{WS: zapcore.AddSync(logFile), FlushInterval: 5 * time.Second}
 	core := zapcore.NewTee(
-		zapcore.NewCore(fileEncoder, zapcore.AddSync(logFile), zap.InfoLevel),
-		zapcore.NewCore(consoleEncoder, zapcore.AddSync(colorable.NewColorableStdout()), zap.InfoLevel),
+		zapcore.NewCore(fileEncoder, blws, zap.InfoLevel),
+		zapcore.NewCore(consoleEncoder, bws, zap.InfoLevel),
 	)
-	return zap.New(core).Sugar(), func() { logFile.Close() }
+	return zap.New(core).Sugar(), func() { bws.Stop(); blws.Stop(); logFile.Close() }
 }
 
 func ListenAndServe(cfg BridgeConfig) error {

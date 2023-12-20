@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
+	"github.com/onemorebsmith/kaspastratum/src/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -61,12 +63,13 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	if ctx.WorkerName != "" {
 		stats, found = sh.stats[ctx.WorkerName]
 	}
+	workerId := fmt.Sprintf("%s:%d", ctx.RemoteAddr, ctx.RemotePort)
 	if !found { // no worker name, check by remote address
-		stats, found = sh.stats[ctx.RemoteAddr]
+		stats, found = sh.stats[workerId]
 		if found {
 			// no worker name, but remote addr is there
-			// so replacet the remote addr with the worker names
-			delete(sh.stats, ctx.RemoteAddr)
+			// so replace the remote addr with the worker names
+			delete(sh.stats, workerId)
 			stats.WorkerName = ctx.WorkerName
 			sh.stats[ctx.WorkerName] = stats
 		}
@@ -74,9 +77,9 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	if !found { // legit doesn't exist, create it
 		stats = &WorkStats{}
 		stats.LastShare = time.Now()
-		stats.WorkerName = ctx.RemoteAddr
+		stats.WorkerName = workerId
 		stats.StartTime = time.Now()
-		sh.stats[ctx.RemoteAddr] = stats
+		sh.stats[workerId] = stats
 
 		// TODO: not sure this is the best place, nor whether we shouldn't be
 		// resetting on disconnect
@@ -391,6 +394,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 	//   < 5% variation after 4h
 	var windows = [...]uint{1, 3, 10, 30, 60, 240, 0}
 	var tolerances = [...]float64{1, 0.5, 0.25, 0.15, 0.1, 0.05, 0.05}
+	var bws = &utils.BufferedWriteSyncer{WS: os.Stdout, FlushInterval: varDiffThreadSleep * time.Second}
 
 	for {
 		time.Sleep(varDiffThreadSleep * time.Second)
@@ -407,12 +411,13 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 		var toleranceErrs []string
 
 		for _, v := range sh.stats {
+			worker := v.WorkerName
 			if v.VarDiffStartTime.IsZero() {
 				// no vardiff sent to client
+				toleranceErrs = append(toleranceErrs, fmt.Sprintf("no diff sent to client %s", worker))
 				continue
 			}
 
-			worker := v.WorkerName
 			diff := v.MinDiff.Load()
 			shares := v.VarDiffSharesFound.Load()
 			duration := time.Since(v.VarDiffStartTime).Minutes()
@@ -473,9 +478,9 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 		sort.Strings(statsLines)
 		stats += strings.Join(statsLines, "\n")
 		stats += "\n\n========================================================== ks_bridge_" + version + " ===\n"
-		stats += strings.Join(toleranceErrs, "\n")
+		stats += "\n" + strings.Join(toleranceErrs, "\n") + "\n\n"
 		if logStats {
-			log.Println(stats)
+			bws.Write([]byte(stats))
 		}
 
 		// sh.statsLock.Unlock()
@@ -490,10 +495,12 @@ func updateVarDiff(stats *WorkStats, minDiff float64, clamp bool) float64 {
 	}
 
 	previousMinDiff := stats.MinDiff.Load()
-	if minDiff != previousMinDiff {
+	newMinDiff := math.Max(0.125, minDiff)
+	if newMinDiff != previousMinDiff {
+		log.Printf("updating vardiff to %f for client %s", newMinDiff, stats.WorkerName)
 		stats.VarDiffStartTime = time.Time{}
 		stats.VarDiffWindow = 0
-		stats.MinDiff.Store(math.Max(0.125, minDiff))
+		stats.MinDiff.Store(newMinDiff)
 	}
 	return previousMinDiff
 }
