@@ -234,12 +234,13 @@ Config parameters can also be specificied by command line flags, which have slig
 
 IceRiver ASICs require a 2 byte extranonce (extranonce_size=2), an increased minimum share difficulty (use vardiff, or see table below), and difficulty values limited to 2^n (pow2_clamp=true).  Without these settings, you may experience lower than expected hashrates and/or high invalid rates.  It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you prefer to set a fixed difficulty, disable vardiff, and consult the following table for the recommended settings for each of the different devices (should produce minimum 20 shares/min):
 
-|ASIC | Min Diff |
-| --- | ---- |
-|KS0  | 64   |
-|KS1  | 512  |
-|KS2  | 1024 |
-|KS3L | 2048 |
-|KS3  | 4096 |
+|ASIC   | Min Diff |
+| ----- | ---- |
+|KS0    |   64 |
+|KS0PRO |  128 |
+|KS1    |  512 |
+|KS2    | 1024 |
+|KS3L   | 2048 |
+|KS3    | 4096 |
 
 See previous sections for details on setting these parameters for your particular installation.
