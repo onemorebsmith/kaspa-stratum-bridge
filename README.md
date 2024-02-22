@@ -240,7 +240,7 @@ IceRiver ASICs require a 2 byte extranonce (extranonce_size=2), an increased min
 |KS0PRO |  128 |
 |KS1    |  512 |
 |KS2    | 1024 |
-|KS3L   | 2048 |
+|KS3L/M | 2048 |
 |KS3    | 4096 |
 
 See previous sections for details on setting these parameters for your particular installation.
