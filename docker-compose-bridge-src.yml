@@ -1,0 +1,16 @@
+services:
+  ks_bridge:
+    build:
+      context: .
+      no_cache: true
+    container_name: ks_bridge
+    restart: unless-stopped
+    user: "0"
+    command:
+      - '-stats=false'
+      - '-kaspa=host.docker.internal:16110'
+    ports:
+      - 5555:5555
+      - 2114:2114
+    extra_hosts:
+      - host.docker.internal:host-gateway

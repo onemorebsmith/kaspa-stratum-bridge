@@ -1,4 +1,5 @@
-# stratum_listen_port: the port that will be listening for incoming stratum traffic
+# stratum_listen_port: the port that will be listening for incoming stratum 
+# traffic
 # Note `:PORT` format is needed if not specifiying a specific ip range 
 stratum_port: :5555
 
@@ -8,16 +9,56 @@ stratum_port: :5555
 # kaspad_address: 46.17.104.200:16110
 kaspad_address: localhost:16110
 
-# min_share_diff: only accept shares of the specified difficulty (or higher) from 
-# the miner(s).  Higher values will reduce the number of shares submitted, thereby 
-# reducing network traffic and server load, while lower values will increase the
-# number of shares submitted, thereby reducing the amount of time needed for 
-# accurate hashrate measurements
-# min_share_diff: 4
+# min_share_diff: only accept shares of the specified difficulty (or higher) 
+# from the miner(s).  Higher values will reduce the number of shares submitted, 
+# thereby reducing network traffic and server load, while lower values will 
+# increase the number of shares submitted, thereby reducing the amount of time 
+# needed for accurate hashrate measurements
+#
+# If var_diff is enabled, min_share_diff will be the starting difficulty.
+#
+# Default value is chosen to accomodate current top of the line IceRiver ASICs.
+# If you don't want to change the default to match your device(s), the vardiff 
+# engine will adjust to an appropriate diff for lower hashrate devices within a 
+# few minutes.
+min_share_diff: 4096
+
+# pow2_clamp: restrict difficulty to 2^n (e.g. 64, 128, 256, etc). This is 
+# required for IceRiver and BitMain ASICs, where difficulties further away from
+# powers of 2 cause higher error rates.  Using this feature will limit the 
+# functionality of vardiff, such that the shares_per_min becomes more of a 
+# minimum, rather than a target we can expect to converge on.
+pow2_clamp: false
+
+# var_diff: if true, enables the auto-adjusting variable share diff mechanism. 
+# Starts with the value defined by the 'min_share_diff' setting, then checks 
+# every 10s whether each client is maintaining a 20 shares/minute submission 
+# rate, and sends an updated min diff per client if necessary.  Max tolerance 
+# is +/- 5% after 4hrs.
+var_diff: true
+
+# shares_per_min: number of shares per minute the vardiff engine should target.
+# Default value is chosen to allow for 99% confidence in measurement accuracy, 
+# which affects fidelity of difficulty update decisions, as well as hashrate
+# stability (measured 1hr avg hashrate should be within +/- 10% of actual, with
+# the noted confidence.)  Higher values will result in better vardiff engine
+# performance and increased hashrate stability.  Lower values will cause 
+# vardiff to behave more erratically, while measured hashrate will display 
+# larger variations.
+#
+# Incorrect configuration of this parameter may induce high error rates on 
+# IceRiver devices, so it is recommended to avoid unnecessary changes.
+# 
+# Example values and their resulting confidence levels:
+# 20 => 99%, 15 => 95%, 12 => 90%
+shares_per_min: 20
+
+# var_diff_stats: if true, print vardiff engine stats to the log every 10s 
+var_diff_stats: false
 
 # block_wait_time: time to wait since last new block message from kaspad before
-# manually requesting a new block
-# block_wait_time: 500ms
+# manually requesting a new block.  Examples are '500ms', '3s', '1m', etc.
+block_wait_time: 3s
 
 # extranonce_size: size in bytes of extranonce, from 0 (no extranonce) to 3. 
 # With no extranonce (0), all clients will search through the same nonce-space,
@@ -27,7 +68,7 @@ kaspad_address: localhost:16110
 # overall nonce-space (though with 1s block times, this shouldn't really
 # be a concern). 
 # 1 byte = 256 clients, 2 bytes = 65536, 3 bytes = 16777216.
-# extranonce_size: 0
+extranonce_size: 0
 
 # print_stats: if true will print stats to the console, false just workers
 # joining/disconnecting, blocks found, and errors will be printed
@@ -36,7 +77,7 @@ print_stats: true
 # log_to_file: if true logs will be written to a file local to the executable
 log_to_file: true
 
-# prom_port: if this is specified prometheus will serve stats on the port provided
+# prom_port: if specified, prometheus will serve stats on the port provided
 # see readme for summary on how to get prom up and running using docker
 # you can get the raw metrics (along with default golang metrics) using
 # `curl http://localhost:{prom_port}/metrics`
