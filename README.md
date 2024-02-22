@@ -8,6 +8,7 @@ This daemon is confirmed working with the miners below in both kaspa-only and du
 * srbminer
 * teamreadminer
 * IceRiver ASICs <font size="1">[*(setup details)*](#iceriver-asics-configuration-details)</font>
+* Bitmain ASICS
 
 Hive setup: [detailed instructions here](docs/hive-setup.md) 
 
@@ -78,7 +79,7 @@ ks_worker_job_counter{ip="192.168.0.65",miner="BzMiner-v11.1.0",wallet="kaspa:qz
 
 # Installation
 
-## Build from source (native executable)
+## Option 1: Build from source (native executable)
 
 * Install go 1.18 or later using whatever package manager is approprate for your system, or from https://go.dev/doc/install.
 
@@ -90,7 +91,7 @@ ks_worker_job_counter{ip="192.168.0.65",miner="BzMiner-v11.1.0",wallet="kaspa:qz
 
 All-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 
-## Docker all-in-one
+## Option 2: Docker all-in-one
 
 *Best option for users who want access to reporting, and aren't already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
   
@@ -105,7 +106,7 @@ All-in-one (build + run) `cd cmd/kaspabridge/;go build .;./kaspabridge`
 Many of the stats on the graph are averaged over a configurable time period (24hr default - use the 'resolution' dropdown to change this), so keep in mind that the metrics might be incomplete during this initial period.
 
 
-## Docker bridge only
+## Option 3: Docker bridge only
 
 *Best option for users who want docker encapsulation, and don't need reporting, or are already using Grafana/Prometheus.  Requires a local copy of this repository, and docker installation.*
 
@@ -232,7 +233,9 @@ Config parameters can also be specificied by command line flags, which have slig
 
 ## IceRiver ASICs configuration details
 
-IceRiver ASICs require a 2 byte extranonce (extranonce_size=2), an increased minimum share difficulty (use vardiff, or see table below), and difficulty values limited to 2^n (pow2_clamp=true).  Without these settings, you may experience lower than expected hashrates and/or high invalid rates.  It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you prefer to set a fixed difficulty, disable vardiff, and consult the following table for the recommended settings for each of the different devices (should produce minimum 20 shares/min):
+IceRiver ASICs require a 2 byte extranonce (extranonce_size=2), an increased minimum share difficulty (use vardiff, or see table below), and difficulty values limited to 2^n (pow2_clamp=true).  Without these settings, you may experience lower than expected hashrates and/or high invalid rates.  
+
+It is recommended to allow the variable difficulty engine to determine the proper diff setting per client (enabled by default), but if you prefer to set a fixed difficulty, disable vardiff, and consult the following table for the recommended settings for each of the different devices (should produce minimum 20 shares/min):
 
 |ASIC   | Min Diff |
 | ----- | ---- |
