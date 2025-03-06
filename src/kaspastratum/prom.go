@@ -120,7 +120,7 @@ func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64,
 	labels := commonLabels(worker)
 	labels["nonce"] = fmt.Sprintf("%d", nonce)
 	labels["bluescore"] = fmt.Sprintf("%d", bluescore)
-	labels["hash"] = fmt.Sprintf("%d", hash)
+	labels["hash"] = hash
 	blockGauge.With(labels).Set(1)
 }
 
@@ -152,15 +152,15 @@ func InitInvalidCounter(worker *gostratum.StratumContext, errorType string) {
 }
 
 func InitWorkerCounters(worker *gostratum.StratumContext) {
-  labels := commonLabels(worker)
+	labels := commonLabels(worker)
 
 	shareCounter.With(labels).Add(0)
 	shareDiffCounter.With(labels).Add(0)
 
-  errTypes := []string{"stale", "duplicate", "invalid", "weak"}
-  for _, e := range errTypes {
-    InitInvalidCounter(worker, e)
-  }
+	errTypes := []string{"stale", "duplicate", "invalid", "weak"}
+	for _, e := range errTypes {
+		InitInvalidCounter(worker, e)
+	}
 
 	blockCounter.With(labels).Add(0)
 
